@@ -37,9 +37,9 @@
     <!-- Mode Selector & Controls -->
     <div class="flex items-center space-x-3">
       <div class="flex space-x-1 bg-slate-950 p-0.5 rounded border border-slate-800 text-xs">
-        <button id="btn-mode-1" class="mode-btn px-2.5 py-1 rounded font-semibold bg-indigo-600 text-white">[1] Bloomberg TUI</button>
-        <button id="btn-mode-2" class="mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white">[2] Desktop Canvas</button>
-        <button id="btn-mode-3" class="mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white">[3] Bonsai DAG</button>
+        <button id="btn-mode-1" class="mode-btn px-2.5 py-1 rounded font-semibold bg-indigo-600 text-white">[1] Bloomberg 3-Pane</button>
+        <button id="btn-mode-2" class="mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white">[2] Full-Width Canvas & Blotter</button>
+        <button id="btn-mode-3" class="mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white">[3] Bonsai DAG Topology</button>
       </div>
 
       <div class="h-4 w-px bg-slate-700 mx-1"></div>
@@ -51,8 +51,8 @@
   <!-- MAIN WORKSPACE -->
   <div class="flex-1 flex overflow-hidden">
     
-    <!-- LEFT PANEL: Market Watch & Depth of Market -->
-    <aside class="w-72 border-r border-slate-800 bg-slate-900 flex flex-col flex-shrink-0">
+    <!-- LEFT PANEL: Market Watch & Depth of Market (Visible in Mode 1) -->
+    <aside id="left-sidebar" class="w-72 border-r border-slate-800 bg-slate-900 flex flex-col flex-shrink-0 transition-all duration-200">
       
       <!-- Symbol Header -->
       <div class="p-3 border-b border-slate-800">
@@ -126,6 +126,7 @@
           <span class="font-bold text-white">ALI_FUT</span>
           <span class="text-slate-400">(Aluminium 3M &bull; USD/MT)</span>
           <span class="text-purple-300 font-semibold" id="bb-header-legend">BB(20, 2): Upper $2,632.50 | Mid $2,624.50 | Lower $2,616.50</span>
+          <span id="view-mode-badge" class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px]">VIEW: 3-PANE WORKSPACE</span>
         </div>
         <div class="text-xs font-mono text-slate-400 flex items-center space-x-4">
           <span>Spot: <strong id="stat-c" class="text-white">$2,624.50/MT</strong></span>
@@ -138,12 +139,19 @@
         <canvas id="main-chart-canvas" class="w-full h-full block"></canvas>
       </div>
 
-      <!-- Execution Tape & Position Ledger -->
+      <!-- Bottom Split: Execution Tape & Position Ledger -->
       <div class="h-44 border-t border-slate-800 bg-slate-900 flex flex-col flex-shrink-0">
-        <div class="h-8 border-b border-slate-800 px-3 flex items-center space-x-4 text-xs font-medium bg-slate-950/30">
-          <span class="text-indigo-400 font-semibold">Active Position Ledger &bull; LME Aluminium</span>
-          <span class="text-slate-500">|</span>
-          <span class="text-slate-400">Recent Fills (Match Engine)</span>
+        <div class="h-8 border-b border-slate-800 px-3 flex items-center justify-between text-xs font-medium bg-slate-950/30">
+          <div class="flex items-center space-x-3">
+            <span class="text-indigo-400 font-semibold">Active Position Ledger &bull; LME Aluminium</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-400">Real-Time Execution Blotter (Match Engine)</span>
+          </div>
+          <div class="flex items-center space-x-2 text-[11px] text-slate-400">
+            <span>Lot Size: <strong class="text-amber-400 font-mono">25 MT</strong></span>
+            <span>&bull;</span>
+            <span>Tick Size: <strong class="text-white font-mono">$0.50 ($12.50/lot)</strong></span>
+          </div>
         </div>
         <div class="flex-1 p-2 overflow-auto font-mono text-xs">
           <table class="w-full text-left">
@@ -155,9 +163,11 @@
                 <th>Current Spot</th>
                 <th>Unrealized PnL</th>
                 <th>Hedge Status</th>
+                <th>Last Order ID</th>
+                <th>Execution Engine</th>
               </tr>
             </thead>
-            <tbody class="divide-y border-slate-800">
+            <tbody id="position-tbody" class="divide-y border-slate-800">
               <tr>
                 <td class="py-1 font-bold text-white">ALI_FUT</td>
                 <td id="pos-lots" class="text-rose-400 font-semibold">-2.00 lots (50 MT)</td>
@@ -165,6 +175,8 @@
                 <td id="pos-current">$2,624.50</td>
                 <td id="pos-pnl" class="text-rose-400 font-bold">-$50.00</td>
                 <td class="text-indigo-400">&Delta;-Neutral Protected (Black-76)</td>
+                <td class="text-slate-400" id="last-order-id">ALI_0001</td>
+                <td class="text-emerald-400">Cordis OxCaml</td>
               </tr>
             </tbody>
           </table>
@@ -172,8 +184,8 @@
       </div>
     </main>
 
-    <!-- RIGHT PANEL: Commodity Greeks & Account Summary -->
-    <aside class="w-64 border-l border-slate-800 bg-slate-900 flex flex-col flex-shrink-0">
+    <!-- RIGHT PANEL: Commodity Greeks & Account Summary (Visible in Mode 1) -->
+    <aside id="right-sidebar" class="w-64 border-l border-slate-800 bg-slate-900 flex flex-col flex-shrink-0 transition-all duration-200">
       
       <!-- Bollinger Volatility Panel -->
       <div class="p-3 border-b border-slate-800">
@@ -264,10 +276,11 @@
     let lots = -2.0;
     let avgEntry = 2623.50;
     let pnl = -50.00;
+    let orderSeq = 1;
 
     const bars = [];
     let p = 2615.0;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 70; i++) {
       const o = p;
       p = Math.max(2400, p + ((i * 7) % 11 - 5) * 0.50 + (Math.random() - 0.48) * 1.5);
       const c = p;
@@ -289,23 +302,39 @@
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, w, h);
 
+      // =========================================================================
+      // MODE 3: JANE STREET BONSAI INCREMENTAL DAG TOPOLOGY
+      // =========================================================================
       if (mode === 3) {
-        // Draw Bonsai DAG
         ctx.fillStyle = '#10b981';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText('JANE STREET BONSAI / INCR_DOM INCREMENTAL DAG TOPOLOGY', 20, 30);
-        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillText('JANE STREET BONSAI / INCR_DOM INCREMENTAL DAG TOPOLOGY', 24, 32);
+        ctx.fillStyle = '#94a3b8';
         ctx.font = '11px sans-serif';
-        ctx.fillText('Sub-millisecond Reactive Dynamic Computation Graph (< 0.028 ms)', 20, 50);
+        ctx.fillText('Reactive Directed Acyclic Graph (DAG) Sub-millisecond Execution (< 0.028 ms)', 24, 52);
 
         const nodes = [
-          { title: 'Node 1: Market Feed (ALI_FUT)', desc: `Spot: $${spot.toFixed(2)}`, color: '#38bdf8', x: 140, y: 120 },
-          { title: 'Node 2: OHLCV Aggregator', desc: '500 Bounded Ring Slots', color: '#818cf8', x: 420, y: 80 },
-          { title: 'Node 3: Bollinger Volatility', desc: 'Channel (20, 2.0) Active', color: '#c084fc', x: 700, y: 50 },
-          { title: 'Node 4: Greeks Engine', desc: 'Delta (Δ): 0.5240', color: '#f59e0b', x: 420, y: 200 },
-          { title: 'Node 5: Delta-Neutral Hedger', desc: 'Target: -2.62 lots', color: '#10b981', x: 700, y: 200 }
+          { title: 'Node 1: Market Feed (ALI_FUT)', desc: `Spot: $${spot.toFixed(2)}`, color: '#38bdf8', x: 160, y: 110 },
+          { title: 'Node 2: OHLCV Aggregator', desc: '500 Bounded Ring Slots', color: '#818cf8', x: 460, y: 80 },
+          { title: 'Node 3: Bollinger Volatility', desc: 'Channel (20, 2.0) Active', color: '#c084fc', x: 760, y: 50 },
+          { title: 'Node 4: EMA 20 Stream', desc: `EMA Level: $${spot.toFixed(2)}`, color: '#c084fc', x: 760, y: 120 },
+          { title: 'Node 5: Fincor Greeks Kernel', desc: 'Delta (Δ): 0.5240', color: '#f59e0b', x: 460, y: 210 },
+          { title: 'Node 6: Delta-Neutral Hedger', desc: 'Target: -2.62 lots', color: '#10b981', x: 760, y: 210 },
+          { title: 'Node 7: Position & Margin Ledger', desc: `Lots: ${lots.toFixed(2)} | PnL: $${pnl.toFixed(2)}`, color: '#38bdf8', x: 460, y: 310 }
         ];
 
+        // Edges
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        const edges = [[0, 1], [1, 2], [1, 3], [0, 4], [4, 5], [0, 6]];
+        edges.forEach(([s, d]) => {
+          ctx.beginPath();
+          ctx.moveTo(nodes[s].x + 100, nodes[s].y + 25);
+          ctx.lineTo(nodes[d].x - 100, nodes[d].y + 25);
+          ctx.stroke();
+        });
+
+        // Nodes
         nodes.forEach(n => {
           ctx.fillStyle = '#0f172a';
           ctx.strokeStyle = n.color;
@@ -328,8 +357,11 @@
         return;
       }
 
-      // Compute Bollinger Bands
-      const vis = bars.slice(-50);
+      // =========================================================================
+      // MODES 1 & 2: CHART RENDERING (DIFFERENT VISUAL SCALE & INDICATORS)
+      // =========================================================================
+      const numVisible = (mode === 2) ? 65 : 45; // Mode 2 shows ultra-wide high-res 65 bars
+      const vis = bars.slice(-numVisible);
       const bb = [];
       vis.forEach((_, idx) => {
         const fullIdx = bars.length - vis.length + idx;
@@ -355,33 +387,34 @@
       ctx.strokeStyle = 'rgba(30, 41, 59, 0.8)';
       ctx.font = '10px monospace';
       ctx.fillStyle = '#64748b';
-      for (let i = 1; i <= 5; i++) {
-        const y = (h / 6) * i;
+      for (let i = 1; i <= 6; i++) {
+        const y = (h / 7) * i;
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-        const pVal = maxP - (i / 6.0) * pRange;
+        const pVal = maxP - (i / 7.0) * pRange;
         ctx.fillText(`$${pVal.toFixed(2)}`, chartW + 8, y + 3);
       }
 
       // Draw Bollinger Bands Polygon
-      const upperPts = [], lowerPts = [], midPts = [];
-      vis.forEach((_, i) => {
-        const b = bb[i];
-        if (b) {
-          const x = i * barW + barW / 2;
-          upperPts.push({ x, y: h - ((b.upper - minP) / pRange) * h });
-          lowerPts.push({ x, y: h - ((b.lower - minP) / pRange) * h });
-          midPts.push({ x, y: h - ((b.mean - minP) / pRange) * h });
+      const upperPts = [], lowerPts = [], midPts = [], emaPts = [];
+      vis.forEach((b, i) => {
+        const x = i * barW + barW / 2;
+        const bbItem = bb[i];
+        if (bbItem) {
+          upperPts.push({ x, y: h - ((bbItem.upper - minP) / pRange) * h });
+          lowerPts.push({ x, y: h - ((bbItem.lower - minP) / pRange) * h });
+          midPts.push({ x, y: h - ((bbItem.mean - minP) / pRange) * h });
         }
+        emaPts.push({ x, y: h - (((b.open + b.close)/2.0 - minP) / pRange) * h });
       });
 
       if (upperPts.length > 1) {
-        ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
+        ctx.fillStyle = (mode === 2) ? 'rgba(168, 85, 247, 0.18)' : 'rgba(168, 85, 247, 0.10)';
         ctx.beginPath();
         upperPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
         for (let i = lowerPts.length - 1; i >= 0; i--) ctx.lineTo(lowerPts[i].x, lowerPts[i].y);
         ctx.closePath(); ctx.fill();
 
-        ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 1.8;
+        ctx.strokeStyle = '#c084fc'; ctx.lineWidth = (mode === 2) ? 2.0 : 1.5;
         ctx.beginPath();
         upperPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
         ctx.stroke();
@@ -397,7 +430,7 @@
         ctx.setLineDash([]);
       }
 
-      // Draw Candlesticks
+      // Draw Candlesticks & Volume
       vis.forEach((b, i) => {
         const x = i * barW + barW / 2;
         const oy = h - ((b.open - minP) / pRange) * h;
@@ -408,28 +441,48 @@
         const isUp = b.close >= b.open;
         const col = isUp ? '#10b981' : '#f43f5e';
 
+        // Wick
         ctx.strokeStyle = col; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.moveTo(x, hy); ctx.lineTo(x, ly); ctx.stroke();
 
+        // Candle Body
         ctx.fillStyle = col;
         ctx.fillRect(x - barW * 0.35, Math.min(oy, cy), barW * 0.7, Math.max(2, Math.abs(cy - oy)));
+
+        // Volume bar in Mode 2
+        if (mode === 2) {
+          const volH = (b.vol / 1200) * 35;
+          ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)';
+          ctx.fillRect(x - barW * 0.35, h - volH - 2, barW * 0.7, volH);
+        }
       });
+
+      // Overlay in Mode 2: EMA 20 line
+      if (mode === 2 && emaPts.length > 1) {
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        emaPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+        ctx.stroke();
+      }
     }
 
     function trade(side) {
+      orderSeq++;
       const p = side === 'BUY' ? spot + 0.25 : spot - 0.25;
       const signed = side === 'BUY' ? 1.0 : -1.0;
       lots += signed;
+      document.getElementById('last-order-id').textContent = `ALI_${String(orderSeq).padStart(4, '0')}`;
       updateUI();
     }
 
     function updateDOM() {
       let aHtml = '', bHtml = '';
       for (let i = 3; i >= 1; i--) {
-        aHtml += `<div class="flex justify-between text-rose-400 bg-rose-500/10 p-1 rounded"><span>$${(spot + i*0.5).toFixed(2)}</span><span>${(2+i*2)*25} MT</span></div>`;
+        aHtml += `<div class="flex justify-between text-rose-400 bg-rose-500/10 p-1 rounded font-mono"><span>$${(spot + i*0.5).toFixed(2)}</span><span>${(2+i*2)*25} MT (${2+i*2} lots)</span></div>`;
       }
       for (let i = 1; i <= 3; i++) {
-        bHtml += `<div class="flex justify-between text-emerald-400 bg-emerald-500/10 p-1 rounded"><span>$${(spot - i*0.5).toFixed(2)}</span><span>${(2+i*2)*25} MT</span></div>`;
+        bHtml += `<div class="flex justify-between text-emerald-400 bg-emerald-500/10 p-1 rounded font-mono"><span>$${(spot - i*0.5).toFixed(2)}</span><span>${(2+i*2)*25} MT (${2+i*2} lots)</span></div>`;
       }
       document.getElementById('dom-asks').innerHTML = aHtml;
       document.getElementById('dom-bids').innerHTML = bHtml;
@@ -449,6 +502,7 @@
       
       if (lots !== 0) pnl = lots * 25.0 * (spot - avgEntry);
       document.getElementById('pos-lots').textContent = `${lots.toFixed(2)} lots (${Math.abs(lots*25)} MT)`;
+      document.getElementById('pos-current').textContent = `$${spot.toFixed(2)}`;
       const pnlEl = document.getElementById('pos-pnl');
       pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
       pnlEl.className = pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
@@ -470,10 +524,37 @@
 
     function setMode(m) {
       mode = m;
+      const leftBar = document.getElementById('left-sidebar');
+      const rightBar = document.getElementById('right-sidebar');
+      const badge = document.getElementById('view-mode-badge');
+
+      if (m === 1) {
+        // [1] Bloomberg 3-Pane: Shows DOM Left + Chart Center + Greeks Right
+        leftBar.classList.remove('hidden');
+        rightBar.classList.remove('hidden');
+        badge.textContent = 'VIEW: 3-PANE BLOOMBERG PRO WORKSPACE';
+        badge.className = 'px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px]';
+      } else if (m === 2) {
+        // [2] Full-Width Canvas: Collapses sidebars to expand chart to 100% width with volume
+        leftBar.classList.add('hidden');
+        rightBar.classList.add('hidden');
+        badge.textContent = 'VIEW: EXPANDED FULL-WIDTH DESKTOP CANVAS & BLOTTER';
+        badge.className = 'px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px]';
+      } else if (m === 3) {
+        // [3] Bonsai DAG: Shows DAG graph topology
+        leftBar.classList.add('hidden');
+        rightBar.classList.add('hidden');
+        badge.textContent = 'VIEW: JANE STREET BONSAI INCREMENTAL DAG TOPOLOGY';
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px]';
+      }
+
       document.querySelectorAll('.mode-btn').forEach((b, i) => {
-        b.className = (i + 1 === m) ? 'mode-btn px-2.5 py-1 rounded font-semibold bg-indigo-600 text-white' : 'mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white';
+        b.className = (i + 1 === m) 
+          ? 'mode-btn px-2.5 py-1 rounded font-semibold bg-indigo-600 text-white' 
+          : 'mode-btn px-2.5 py-1 rounded text-slate-400 hover:text-white';
       });
-      render();
+
+      setTimeout(render, 50);
     }
 
     document.getElementById('btn-mode-1').onclick = () => setMode(1);
