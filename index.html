@@ -30,8 +30,13 @@
         <span>&bull;</span>
         <span>Ticks: <strong id="ticks-count-display" class="text-white font-mono">0</strong></span>
         <span>&bull;</span>
-        <span>Memory Bound: <strong class="text-sky-400 font-mono">O(1) [500 Slots/TF]</strong></span>
+        <span>Memory Bound: <strong class="text-sky-400 font-mono">O(1) [500 Slots]</strong></span>
       </div>
+      <div class="h-4 w-px bg-slate-700 mx-2"></div>
+      <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center space-x-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>⚡ ZERO-F5 AUTO-SYNC ACTIVE</span>
+      </span>
     </div>
 
     <!-- Mode Selector & Controls -->
@@ -267,7 +272,32 @@
   </div>
 
   <script>
-    // Live In-Browser Engine Core
+    // =========================================================================
+    // CORDIS CONTINUOUS ZERO-F5 AUTO-SYNC SYSTEM
+    // =========================================================================
+    let lastContentHash = null;
+    async function checkLiveUpdate() {
+      try {
+        const cleanUrl = window.location.href.split('?')[0];
+        const res = await fetch(cleanUrl + '?t=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          const hash = text.length + '_' + text.slice(0, 120);
+          if (lastContentHash === null) {
+            lastContentHash = hash;
+          } else if (lastContentHash !== hash) {
+            console.log('[CORDIS AUTO-SYNC] File changed on disk! Auto-reloading view without F5...');
+            lastContentHash = hash;
+            window.location.reload();
+          }
+        }
+      } catch (_) {}
+    }
+    setInterval(checkLiveUpdate, 400);
+
+    // =========================================================================
+    // LIVE COMMODITIES TRADING ENGINE (OXCAML BACKED)
+    // =========================================================================
     let spot = 2624.50;
     let isRunning = true;
     let mode = 1;
@@ -302,9 +332,6 @@
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, w, h);
 
-      // =========================================================================
-      // MODE 3: JANE STREET BONSAI INCREMENTAL DAG TOPOLOGY
-      // =========================================================================
       if (mode === 3) {
         ctx.fillStyle = '#10b981';
         ctx.font = 'bold 15px sans-serif';
@@ -323,7 +350,6 @@
           { title: 'Node 7: Position & Margin Ledger', desc: `Lots: ${lots.toFixed(2)} | PnL: $${pnl.toFixed(2)}`, color: '#38bdf8', x: 460, y: 310 }
         ];
 
-        // Edges
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = 2;
         const edges = [[0, 1], [1, 2], [1, 3], [0, 4], [4, 5], [0, 6]];
@@ -334,7 +360,6 @@
           ctx.stroke();
         });
 
-        // Nodes
         nodes.forEach(n => {
           ctx.fillStyle = '#0f172a';
           ctx.strokeStyle = n.color;
@@ -357,10 +382,7 @@
         return;
       }
 
-      // =========================================================================
-      // MODES 1 & 2: CHART RENDERING (DIFFERENT VISUAL SCALE & INDICATORS)
-      // =========================================================================
-      const numVisible = (mode === 2) ? 65 : 45; // Mode 2 shows ultra-wide high-res 65 bars
+      const numVisible = (mode === 2) ? 65 : 45;
       const vis = bars.slice(-numVisible);
       const bb = [];
       vis.forEach((_, idx) => {
@@ -441,15 +463,12 @@
         const isUp = b.close >= b.open;
         const col = isUp ? '#10b981' : '#f43f5e';
 
-        // Wick
         ctx.strokeStyle = col; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.moveTo(x, hy); ctx.lineTo(x, ly); ctx.stroke();
 
-        // Candle Body
         ctx.fillStyle = col;
         ctx.fillRect(x - barW * 0.35, Math.min(oy, cy), barW * 0.7, Math.max(2, Math.abs(cy - oy)));
 
-        // Volume bar in Mode 2
         if (mode === 2) {
           const volH = (b.vol / 1200) * 35;
           ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)';
@@ -457,7 +476,6 @@
         }
       });
 
-      // Overlay in Mode 2: EMA 20 line
       if (mode === 2 && emaPts.length > 1) {
         ctx.strokeStyle = '#818cf8';
         ctx.lineWidth = 1.6;
@@ -529,19 +547,16 @@
       const badge = document.getElementById('view-mode-badge');
 
       if (m === 1) {
-        // [1] Bloomberg 3-Pane: Shows DOM Left + Chart Center + Greeks Right
         leftBar.classList.remove('hidden');
         rightBar.classList.remove('hidden');
         badge.textContent = 'VIEW: 3-PANE BLOOMBERG PRO WORKSPACE';
         badge.className = 'px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px]';
       } else if (m === 2) {
-        // [2] Full-Width Canvas: Collapses sidebars to expand chart to 100% width with volume
         leftBar.classList.add('hidden');
         rightBar.classList.add('hidden');
         badge.textContent = 'VIEW: EXPANDED FULL-WIDTH DESKTOP CANVAS & BLOTTER';
         badge.className = 'px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px]';
       } else if (m === 3) {
-        // [3] Bonsai DAG: Shows DAG graph topology
         leftBar.classList.add('hidden');
         rightBar.classList.add('hidden');
         badge.textContent = 'VIEW: JANE STREET BONSAI INCREMENTAL DAG TOPOLOGY';
