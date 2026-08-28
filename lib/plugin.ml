@@ -1,4 +1,4 @@
-(* lib/plugin.ml - Hot-Swappable Plugin Subsystem with Fault Isolation *)
+﻿(* lib/plugin.ml - Hot-Swappable Plugin Subsystem with Fault Isolation (Cordis Theorem 4) *)
 
 open Types
 open Context
@@ -77,7 +77,7 @@ module Registry = struct
       (entry.id, entry.name, entry.version, entry.status) :: acc
     ) plugins []
 
-  (* Fault-Isolated Event Dispatcher: Never throws or crashes the engine *)
+  (* Fault-Isolated Event Dispatcher: Invariant T4 *)
   let dispatch_event (ctx : (module CONTEXT)) (ev : system_event) (current_time : float) : command list =
     let all_commands = ref [] in
     Hashtbl.iter (fun _ entry ->
@@ -92,7 +92,7 @@ module Registry = struct
            entry.error_count <- entry.error_count + 1;
            let err_msg = Printexc.to_string exn in
            entry.status <- Quarantined { reason = err_msg; timestamp = current_time };
-           let alert_cmd = LogMessage (Error, Printf.sprintf ""[PLUGIN QUARANTINED] %s (id: %s) failed: %s"" entry.name entry.id err_msg) in
+           let alert_cmd = LogMessage (`Error, Printf.sprintf "[PLUGIN QUARANTINED] %s (id: %s) failed: %s" entry.name entry.id err_msg) in
            all_commands := alert_cmd :: !all_commands)
       | Disabled | Quarantined _ -> ()
     ) plugins;

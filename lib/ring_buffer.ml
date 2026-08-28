@@ -1,4 +1,4 @@
-(* lib/ring_buffer.ml - Bounded Memory Ring Buffer for Non-Stop Operation *)
+﻿(* lib/ring_buffer.ml - Bounded Memory Ring Buffer (Cordis Theorem 3: O(1) Memory Bound) *)
 
 type 'a t = {
   buffer : 'a option array;
@@ -8,7 +8,7 @@ type 'a t = {
 }
 
 let create capacity =
-  if capacity <= 0 then invalid_arg ""RingBuffer capacity must be positive"";
+  if capacity <= 0 then invalid_arg "RingBuffer capacity must be positive";
   {
     buffer = Array.make capacity None;
     capacity;

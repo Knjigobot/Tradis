@@ -1,4 +1,6 @@
-(* lib/types.ml - Core Trading Engine Types *)
+﻿(* lib/types.ml - Core Trading Types with GADT Order Lifecycles *)
+
+open Commodity
 
 type symbol = string
 
@@ -24,7 +26,7 @@ type tick = {
   bid : float;
   ask : float;
   last_price : float;
-  volume : float;
+  volume_mt : float;
 }
 
 type bar = {
@@ -35,7 +37,7 @@ type bar = {
   high_p : float;
   low_p : float;
   close_p : float;
-  volume : float;
+  volume_mt : float;
 }
 
 type order_direction = Buy | Sell
@@ -45,26 +47,34 @@ type order_type =
   | Limit of float
   | Stop of float
 
-type order_status =
-  | Pending
-  | Active
-  | Filled of { fill_price : float; fill_time : float }
-  | Canceled of string
-  | Rejected of string
+(* GADT Order State Machine: Making invalid lifecycle transitions unrepresentable *)
+type pending = Pending
+type active  = Active
+type filled  = Filled
+type canceled = Canceled
+
+type _ order_state =
+  | New : pending order_state
+  | Submitted : { broker_id : int; time : float } -> active order_state
+  | PartFilled : { filled_lots : float; remaining_lots : float } -> active order_state
+  | Done : { fill_price : float; total_lots : float; fill_time : float } -> filled order_state
+  | Expired : { reason : string } -> canceled order_state
+  | Rejected : { reason : string } -> canceled order_state
 
 type order = {
   id : string;
   symbol : symbol;
   direction : order_direction;
   order_type : order_type;
-  qty : float;
-  mutable status : order_status;
+  lots : float;
+  mutable status_str : string;
   created_time : float;
 }
 
 type position = {
   symbol : symbol;
-  mutable qty : float;
+  spec : contract_spec;
+  mutable lots : float;
   mutable avg_entry_price : float;
   mutable unrealized_pnl : float;
 }
@@ -89,6 +99,6 @@ type system_event =
 type command =
   | SubmitOrder of order
   | CancelOrder of string
-  | ModifyPosition of symbol * float
-  | LogMessage of [ Info | Warn | Error ] * string
+  | ModifyPosition of symbol * float (* target lots *)
+  | LogMessage of [ `Info | `Warn | `Error ] * string
   | NotifyPlugin of string * string

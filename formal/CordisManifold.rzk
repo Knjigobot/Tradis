@@ -1,0 +1,13 @@
+﻿#lang rzk-1
+
+#def is-spatiotemporal-simplex
+  ( A : U )
+  ( t0 t1 : A )
+  : U
+  := ( t0 = t1 )
+
+#def cordis-coeffect-manifold
+  ( SpatialContext : U )
+  ( TemporalFiltration : U )
+  : U
+  := ( SpatialContext -> TemporalFiltration -> U )

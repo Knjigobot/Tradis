@@ -1,4 +1,4 @@
-(* lib/context.ml - Spatial Coeffect Context for Tradis Runtime *)
+﻿(* lib/context.ml - Spatial Coeffect Context for Tradis Runtime (Cordis Theorem 1) *)
 
 open Types
 
@@ -46,8 +46,8 @@ end = struct
         | LatestTick _ -> (None : a)
         | CurrentPosition _ -> (None : a)
         | ActiveAccount _ -> (None : a)
-        | BarHistory _ -> failwith ""BarHistory not initialized in context""
-        | Arbitrary name -> failwith (""Arbitrary key '"" ^ name ^ ""' not found in context"")
+        | BarHistory _ -> failwith "BarHistory not initialized in context"
+        | Arbitrary name -> failwith ("Arbitrary key '" ^ name ^ "' not found in context")
 
   let has : type a. a key -> bool =
     fun k ->
