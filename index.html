@@ -134,7 +134,6 @@
         <div class="flex items-center space-x-3 text-xs">
           <span class="font-bold text-white">ALI_FUT</span>
           <span class="text-slate-400">(Aluminium 3M &bull; USD/MT)</span>
-          <span class="text-purple-300 font-semibold" id="bb-header-legend">BB(20, 2): Upper $2,632.50 | Mid $2,624.50 | Lower $2,616.50</span>
           <span id="view-mode-badge" class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px]">VIEW: 3-PANE WORKSPACE</span>
         </div>
         <div class="text-xs font-mono text-slate-400 flex items-center space-x-4">
@@ -196,28 +195,6 @@
     <!-- RIGHT PANEL: Commodity Greeks & Account Summary -->
     <aside id="right-sidebar" class="w-64 border-l border-slate-800 bg-slate-900 flex flex-col flex-shrink-0 transition-all duration-200">
       
-      <!-- Bollinger Volatility Panel -->
-      <div class="p-3 border-b border-slate-800">
-        <div class="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-2 flex items-center justify-between">
-          <span>Bollinger Volatility</span>
-          <span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono">20, 2.0</span>
-        </div>
-        <div class="space-y-1 text-xs font-mono">
-          <div class="flex justify-between text-slate-400">
-            <span>Upper Band:</span>
-            <strong id="bb-upper-val" class="text-purple-300">$2,634.50</strong>
-          </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Lower Band:</span>
-            <strong id="bb-lower-val" class="text-purple-300">$2,614.50</strong>
-          </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Bandwidth:</span>
-            <strong id="bb-bw-val" class="text-sky-400">0.76%</strong>
-          </div>
-        </div>
-      </div>
-
       <!-- Fincor Greeks Panel -->
       <div class="p-3 border-b border-slate-800">
         <div class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-2 flex items-center justify-between">
@@ -359,7 +336,7 @@
         const nodes = [
           { title: 'Node 1: Market Feed (ALI_FUT)', desc: `Spot: $${spot.toFixed(2)}`, color: '#38bdf8', x: 160, y: 110 },
           { title: 'Node 2: OHLCV Aggregator', desc: '500 Bounded Ring Slots', color: '#818cf8', x: 460, y: 80 },
-          { title: 'Node 3: Bollinger Volatility', desc: 'Channel (20, 2.0) Active', color: '#c084fc', x: 760, y: 50 },
+          { title: 'Node 3: Price Action Engine', desc: 'Pure Candlestick Stream', color: '#38bdf8', x: 760, y: 50 },
           { title: 'Node 4: EMA 20 Stream', desc: `EMA Level: $${spot.toFixed(2)}`, color: '#c084fc', x: 760, y: 120 },
           { title: 'Node 5: Fincor Greeks Kernel', desc: 'Delta (Δ): 0.5240', color: '#f59e0b', x: 460, y: 210 },
           { title: 'Node 6: Delta-Neutral Hedger', desc: 'Target: -2.62 lots', color: '#10b981', x: 760, y: 210 },
@@ -398,23 +375,12 @@
         return;
       }
 
-      // Modes 1 & 2: Candlesticks with Shaded Bollinger Bands Volatility Cloud
+      // Modes 1 & 2: Pure Clean Candlesticks (Bollinger Bands Completely Removed)
       const numVisible = (mode === 2) ? 65 : 45;
       const vis = bars.slice(-numVisible);
-      const bb = [];
-      vis.forEach((_, idx) => {
-        const fullIdx = bars.length - vis.length + idx;
-        if (fullIdx >= 19) {
-          const win = bars.slice(fullIdx - 19, fullIdx + 1);
-          const mean = win.reduce((s, b) => s + b.close, 0) / 20.0;
-          const sd = Math.sqrt(win.reduce((s, b) => s + Math.pow(b.close - mean, 2), 0) / 20.0);
-          bb.push({ mean, upper: mean + 2.0 * sd, lower: mean - 2.0 * sd });
-        } else bb.push(null);
-      });
 
       let minP = Math.min(...vis.map(b => b.low));
       let maxP = Math.max(...vis.map(b => b.high));
-      bb.forEach(b => { if (b) { minP = Math.min(minP, b.lower); maxP = Math.max(maxP, b.upper); } });
       const pad = (maxP - minP) * 0.12 || 1.5;
       minP -= pad; maxP += pad;
       const pRange = maxP - minP;
@@ -431,41 +397,6 @@
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
         const pVal = maxP - (i / 7.0) * pRange;
         ctx.fillText(`$${pVal.toFixed(2)}`, chartW + 8, y + 3);
-      }
-
-      // Draw Bollinger Bands Shaded Polygon
-      const upperPts = [], lowerPts = [], midPts = [];
-      vis.forEach((b, i) => {
-        const x = i * barW + barW / 2;
-        const bbItem = bb[i];
-        if (bbItem) {
-          upperPts.push({ x, y: h - ((bbItem.upper - minP) / pRange) * h });
-          lowerPts.push({ x, y: h - ((bbItem.lower - minP) / pRange) * h });
-          midPts.push({ x, y: h - ((bbItem.mean - minP) / pRange) * h });
-        }
-      });
-
-      if (upperPts.length > 1) {
-        ctx.fillStyle = (mode === 2) ? 'rgba(168, 85, 247, 0.18)' : 'rgba(168, 85, 247, 0.12)';
-        ctx.beginPath();
-        upperPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
-        for (let i = lowerPts.length - 1; i >= 0; i--) ctx.lineTo(lowerPts[i].x, lowerPts[i].y);
-        ctx.closePath(); ctx.fill();
-
-        ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        upperPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
-        ctx.stroke();
-
-        ctx.beginPath();
-        lowerPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
-        ctx.stroke();
-
-        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        midPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
-        ctx.stroke();
-        ctx.setLineDash([]);
       }
 
       // Draw Candlesticks & Volume
