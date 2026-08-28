@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tradis Core: Hot-Swappable Plugin Supervisor (Cordis Theorem 4: Fault Isolation)
  * Erlang/OTP-style supervisor in pure Cordis JS. Rogue plugins are safely quarantined
  * without taking down the 24/7/365 trading engine.
@@ -27,9 +27,9 @@ export class PluginSupervisor {
         errorCount: 0,
         processedEvents: 0
       });
-      this.logAudit([PLUGIN REGISTERED] '' (v) is now ACTIVE.);
+      this.logAudit(`[PLUGIN REGISTERED] '${plugin.name}' (v${plugin.version || '1.0'}) is ACTIVE.`, 'info');
     } catch (err) {
-      this.logAudit([PLUGIN INIT FAILED] '': , 'error');
+      this.logAudit(`[PLUGIN INIT FAILED] '${plugin.name}': ${err.message}`, 'error');
     }
   }
 
@@ -40,15 +40,15 @@ export class PluginSupervisor {
         if (entry.instance.onShutdown) entry.instance.onShutdown(this.context);
       } catch (_) {}
       this.plugins.delete(pluginId);
-      this.logAudit([PLUGIN UNREGISTERED] '' removed cleanly.);
+      this.logAudit(`[PLUGIN UNREGISTERED] '${pluginId}' unloaded cleanly.`, 'info');
     }
   }
 
   hotReload(newPlugin) {
-    this.logAudit([HOT-RELOAD] Reloading plugin '' without engine downtime...);
+    this.logAudit(`[HOT-RELOAD] Reloading plugin '${newPlugin.id}' without engine downtime...`, 'info');
     this.unregister(newPlugin.id);
     this.register(newPlugin);
-    this.logAudit([HOT-RELOAD SUCCESS] Plugin '' upgraded seamlessly.);
+    this.logAudit(`[HOT-RELOAD SUCCESS] Plugin '${newPlugin.id}' upgraded seamlessly.`, 'info');
   }
 
   dispatch(event, currentTime) {
@@ -62,8 +62,8 @@ export class PluginSupervisor {
         } catch (err) {
           entry.errorCount++;
           entry.status = 'Quarantined';
-          this.logAudit([SUPERVISOR INTERCEPT] Rogue plugin '' threw exception: , 'error');
-          this.logAudit([INVARIANT T4] Plugin '' safely QUARANTINED. Core engine 100% stable with 0% downtime., 'warn');
+          this.logAudit(`[SUPERVISOR INTERCEPT] Rogue plugin '${entry.instance.name}' threw exception: ${err.message}`, 'error');
+          this.logAudit(`[INVARIANT T4] Plugin '${id}' safely QUARANTINED. Core engine running with 0% downtime.`, 'warn');
         }
       }
     }

@@ -1,5 +1,5 @@
-/**
- * Tradis UI: Canvas Candlestick & Fincor Greek Chart Renderer
+﻿/**
+ * Tradis UI: Canvas Candlestick & Volume Chart Renderer for Commodity Futures
  */
 export class ChartRenderer {
   constructor(canvas, engine, context) {
@@ -10,6 +10,13 @@ export class ChartRenderer {
     this.activeTimeframe = 'M1';
     this.showEMA = true;
     this.showGreeks = true;
+
+    // Attach ResizeObserver to guarantee crisp high-DPI rendering
+    const parent = this.canvas.parentElement;
+    if (parent && window.ResizeObserver) {
+      const ro = new ResizeObserver(() => this.render());
+      ro.observe(parent);
+    }
   }
 
   setTimeframe(tf) {
@@ -19,13 +26,22 @@ export class ChartRenderer {
 
   render() {
     if (!this.canvas) return;
-    const rect = this.canvas.getBoundingClientRect();
-    this.canvas.width = rect.width * window.devicePixelRatio;
-    this.canvas.height = rect.height * window.devicePixelRatio;
-    this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const parent = this.canvas.parentElement;
+    if (!parent) return;
 
-    const w = rect.width;
-    const h = rect.height;
+    const w = parent.clientWidth || 800;
+    const h = parent.clientHeight || 450;
+
+    if (w <= 0 || h <= 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = w * dpr;
+    this.canvas.height = h * dpr;
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
+
+    this.ctx.resetTransform();
+    this.ctx.scale(dpr, dpr);
     this.ctx.clearRect(0, 0, w, h);
 
     const rb = this.engine.ringBuffers[this.activeTimeframe];
@@ -35,7 +51,7 @@ export class ChartRenderer {
     if (curr) bars.push(curr);
     if (bars.length === 0) return;
 
-    const visibleBars = bars.slice(-60);
+    const visibleBars = bars.slice(-70);
     const numBars = visibleBars.length;
 
     let minPrice = Infinity;
@@ -48,32 +64,36 @@ export class ChartRenderer {
       if (b.volume > maxVol) maxVol = b.volume;
     });
 
-    const padding = (maxPrice - minPrice) * 0.1 || 0.0005;
+    const padding = (maxPrice - minPrice) * 0.12 || 1.0;
     minPrice -= padding;
     maxPrice += padding;
 
-    const chartH = h - 60;
-    const barWidth = Math.max(3, (w - 60) / 60);
+    const rightMargin = 70;
+    const bottomMargin = 40;
+    const chartW = w - rightMargin;
+    const chartH = h - bottomMargin;
+    const barWidth = Math.max(3, chartW / 70);
 
-    // Grid lines & Axis labels
-    this.ctx.strokeStyle = 'rgba(30, 41, 59, 0.7)';
+    // 1. Grid Lines & Axis Labels
+    this.ctx.strokeStyle = 'rgba(30, 41, 59, 0.8)';
     this.ctx.lineWidth = 1;
-    for (let i = 1; i <= 5; i++) {
-      const y = (chartH / 6) * i;
+    this.ctx.font = '10px monospace';
+    this.ctx.fillStyle = '#94a3b8';
+
+    for (let i = 1; i <= 6; i++) {
+      const y = (chartH / 7) * i;
       this.ctx.beginPath();
       this.ctx.moveTo(0, y);
-      this.ctx.lineTo(w - 60, y);
+      this.ctx.lineTo(chartW, y);
       this.ctx.stroke();
 
       const priceAtY = maxPrice - ((y / chartH) * (maxPrice - minPrice));
-      this.ctx.fillStyle = '#64748b';
-      this.ctx.font = '10px monospace';
-      this.ctx.fillText(priceAtY.toFixed(5), w - 55, y + 3);
+      this.ctx.fillText(`$${priceAtY.toFixed(2)}`, chartW + 8, y + 3);
     }
 
     const emaPoints = [];
 
-    // Draw Candles & Volume
+    // 2. Draw Candlesticks & Volume Bars
     visibleBars.forEach((b, idx) => {
       const x = idx * barWidth + barWidth / 2;
       const openY = chartH - ((b.open - minPrice) / (maxPrice - minPrice)) * chartH;
@@ -92,21 +112,21 @@ export class ChartRenderer {
       this.ctx.lineTo(x, lowY);
       this.ctx.stroke();
 
-      // Body
+      // Candle Body
       this.ctx.fillStyle = color;
       const bodyTop = Math.min(openY, closeY);
       const bodyH = Math.max(2, Math.abs(closeY - openY));
       this.ctx.fillRect(x - barWidth * 0.35, bodyTop, barWidth * 0.7, bodyH);
 
-      // Volume
-      const volH = (b.volume / maxVol) * 45;
-      this.ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)';
-      this.ctx.fillRect(x - barWidth * 0.35, h - volH - 5, barWidth * 0.7, volH);
+      // Volume Bar (bottom 35px)
+      const volH = maxVol > 0 ? (b.volume / maxVol) * 35 : 0;
+      this.ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.35)' : 'rgba(244, 63, 94, 0.35)';
+      this.ctx.fillRect(x - barWidth * 0.35, h - volH - 4, barWidth * 0.7, volH);
 
       emaPoints.push({ x, y: (openY + closeY) / 2 });
     });
 
-    // EMA Overlay
+    // 3. EMA 20 Overlay Line
     if (this.showEMA && emaPoints.length > 1) {
       this.ctx.strokeStyle = '#818cf8';
       this.ctx.lineWidth = 1.5;

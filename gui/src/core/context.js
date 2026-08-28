@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tradis Core: Spatial Coeffect Context Manifold (Cordis Theorem 1)
  * Decouples market observables, orders, positions, and accounts.
  */

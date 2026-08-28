@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Tradis Core: Bounded Memory Ring Buffer (Cordis Theorem 3: O(1) Memory Bound)
- * Guarantees zero memory leaks over years of streaming tick/bar feeds.
+ * Guarantees zero memory leaks over years of streaming commodity tick/bar feeds.
  */
 export class RingBuffer {
   constructor(capacity = 500) {
-    if (capacity <= 0) throw new Error('Capacity must be positive');
+    if (capacity <= 0) throw new Error("Capacity must be positive");
     this.capacity = capacity;
     this.buffer = new Array(capacity);
     this.head = 0;
