@@ -1,15 +1,18 @@
 ﻿# -*- coding: utf-8 -*-
 """
 TRADIS: Cordis Spatiotemporal Commodities Desktop Engine (OxCaml Runtime)
-Specialized for LME Primary Aluminium 3M Futures (ALI_FUT)
-Features 3 Visual Display Modes with Real-Time Keyboard Hot-Swapping [1], [2], [3]
+Featuring Dual-Channel In-Memory Live-Sync (Zero-Restart Code Hot-Swapping)
+Preserves 100% of historical bars, active positions, overlays, and Greeks on every edit!
 """
 
 import tkinter as tk
-from tkinter import ttk
 import time
 import math
 import random
+import os
+import sys
+import threading
+import importlib
 
 class BoundedRingBuffer:
     def __init__(self, capacity=500):
@@ -40,7 +43,7 @@ class TradisApp:
         self.root.minsize(1000, 680)
         self.root.configure(bg="#080c14")
 
-        # Core Trading State
+        # Core Trading State (Persisted across Hot-Reloads)
         self.symbol = "ALI_FUT"
         self.contract_name = "LME Primary Aluminium 3M"
         self.lot_size_mt = 25.0
@@ -54,6 +57,8 @@ class TradisApp:
         self.tick_count = 0
         self.start_time = time.time()
         self.display_mode = 1 # 1: Bloomberg TUI, 2: Desktop Canvas, 3: Bonsai DAG
+        self.live_sync_msg = "CORDIS LIVE-SYNC ACTIVE"
+        self.live_sync_time = time.time()
         
         # Bounded Ring Buffers (Theorem 3: O(1) Memory Bound)
         self.ring_buffer_m1 = BoundedRingBuffer(500)
@@ -86,9 +91,55 @@ class TradisApp:
         self.root.bind("q", lambda e: self.root.destroy())
         self.root.bind("Q", lambda e: self.root.destroy())
 
+        # Start Cordis Live-Sync File Watcher (Zero-Restart Dynamic Reloading)
+        self.start_live_sync_watcher()
+
         # Start 30 FPS Engine Animation Loop
         self.last_tick_time = time.time()
         self.engine_loop()
+
+    def start_live_sync_watcher(self):
+        self.self_path = os.path.abspath(__file__)
+        self.last_mtime = os.path.getmtime(self.self_path)
+
+        def watch_loop():
+            while True:
+                time.sleep(0.3)
+                try:
+                    current_mtime = os.path.getmtime(self.self_path)
+                    if current_mtime != self.last_mtime:
+                        self.last_mtime = current_mtime
+                        # Give OS 50ms to finish write flush
+                        time.sleep(0.05)
+                        self.trigger_hot_reload()
+                except Exception as e:
+                    pass
+
+        t = threading.Thread(target=watch_loop, daemon=True)
+        t.start()
+
+    def trigger_hot_reload(self):
+        try:
+            with open(self.self_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            
+            # Compile and hot-patch class methods dynamically into the running instance
+            namespace = {}
+            exec(code, namespace)
+            
+            if 'TradisApp' in namespace:
+                new_cls = namespace['TradisApp']
+                # Hot-swap all methods into the active running instance
+                for attr_name in dir(new_cls):
+                    attr = getattr(new_cls, attr_name)
+                    if callable(attr) and not attr_name.startswith('__'):
+                        setattr(self.__class__, attr_name, attr)
+                
+                self.live_sync_msg = f"⚡ LIVE-SYNC HOT-RELOADED AT {time.strftime('%H:%M:%S')}"
+                self.live_sync_time = time.time()
+                print(f"[CORDIS LIVE SYNC] Hot-swapped new code into running desktop engine at {time.strftime('%H:%M:%S')} without restart!")
+        except Exception as err:
+            print(f"[CORDIS LIVE SYNC ERROR] {err}")
 
     def seed_bars(self, n=60):
         p = 2615.00
@@ -129,7 +180,10 @@ class TradisApp:
         tag2.pack(side=tk.LEFT, padx=3)
 
         self.lbl_stats = tk.Label(brand_frame, text="Uptime: 00:00:00 • Memory: O(1) [500 Slots]", fg="#94a3b8", bg="#0f172a", font=("Consolas", 9))
-        self.lbl_stats.pack(side=tk.LEFT, padx=16)
+        self.lbl_stats.pack(side=tk.LEFT, padx=12)
+
+        self.lbl_sync_badge = tk.Label(brand_frame, text=self.live_sync_msg, fg="#10b981", bg="#064e3b", font=("Consolas", 8, "bold"), padx=6, pady=1)
+        self.lbl_sync_badge.pack(side=tk.LEFT, padx=6)
 
         # Mode Buttons in Header
         mode_frame = tk.Frame(self.header, bg="#0f172a")
@@ -173,7 +227,6 @@ class TradisApp:
 
     def set_display_mode(self, mode):
         self.display_mode = mode
-        # Update button highlights
         buttons = [self.btn_m1, self.btn_m2, self.btn_m3]
         for idx, btn in enumerate(buttons, start=1):
             if idx == mode:
@@ -236,7 +289,6 @@ class TradisApp:
             curr["low"] = min(curr["low"], self.spot)
             curr["vol"] += 25
             
-            # Form new bar every 60s
             if time.time() - curr["time"] > 60:
                 self.ring_buffer_m1.push({
                     "open": self.spot, "high": self.spot, "low": self.spot, "close": self.spot,
@@ -271,36 +323,27 @@ class TradisApp:
             else:
                 bb_data.append(None)
 
-        # =========================================================================
-        # MODE 1: BLOOMBERG TERMINAL PROFESSIONAL DESK
-        # =========================================================================
+        # MODE 1: BLOOMBERG TERMINAL
         if self.display_mode == 1:
-            # Layout: Chart (Left/Top), DOM Ladder (Bottom Left), Greeks (Right)
             chart_w = w - 340
             chart_h = h - 220
-            
             self.draw_chart(10, 10, chart_w, chart_h, bars, bb_data)
             self.draw_dom(10, chart_h + 20, (chart_w // 2) - 10, 190)
             self.draw_positions(chart_w // 2 + 10, chart_h + 20, (chart_w // 2) - 10, 190)
             self.draw_greeks_panel(chart_w + 20, 10, 310, h - 20)
 
-        # =========================================================================
-        # MODE 2: HIGH-RESOLUTION DESKTOP GRAPHICAL CANVAS
-        # =========================================================================
+        # MODE 2: DESKTOP CANVAS
         elif self.display_mode == 2:
             chart_w = w - 20
             chart_h = h - 180
             self.draw_chart(10, 10, chart_w, chart_h, bars, bb_data, is_expanded=True)
             self.draw_execution_tape(10, chart_h + 20, w - 20, 150)
 
-        # =========================================================================
-        # MODE 3: JANE STREET BONSAI / INCR_DOM INCREMENTAL DAG
-        # =========================================================================
+        # MODE 3: BONSAI DAG
         elif self.display_mode == 3:
             self.draw_bonsai_dag(10, 10, w - 20, h - 20, bb_data)
 
     def draw_chart(self, x0, y0, w, h, bars, bb_data, is_expanded=False):
-        # Background & Grid
         self.canvas.create_rectangle(x0, y0, x0 + w, y0 + h, fill="#0b1120", outline="#1e293b", width=1)
         
         vis_bars = bars[-50:]
@@ -391,7 +434,6 @@ class TradisApp:
         self.canvas.create_rectangle(x0, y0, x0 + w, y0 + h, fill="#0b1120", outline="#1e293b")
         self.canvas.create_text(x0 + 10, y0 + 14, text="LME DEPTH OF MARKET (DOM)", fill="#94a3b8", font=("Segoe UI", 9, "bold"), anchor="w")
 
-        # Asks
         for i in range(3, 0, -1):
             p = self.spot + i * 0.50
             lots = 2 + i * 2
@@ -400,13 +442,11 @@ class TradisApp:
             self.canvas.create_text(x0 + 16, row_y, text=f"${p:.2f}", fill="#f43f5e", font=("Consolas", 9, "bold"), anchor="w")
             self.canvas.create_text(x0 + w - 16, row_y, text=f"{lots*25} MT ({lots} lots)", fill="#fda4af", font=("Consolas", 8), anchor="e")
 
-        # Mid Separator
         mid_y = y0 + 106
         self.canvas.create_rectangle(x0 + 10, mid_y - 8, x0 + w - 10, mid_y + 10, fill="#0f172a", outline="#38bdf8")
         self.canvas.create_text(x0 + 16, mid_y, text=f"MID: ${self.spot:.2f}/MT", fill="#38bdf8", font=("Consolas", 9, "bold"), anchor="w")
         self.canvas.create_text(x0 + w - 16, mid_y, text="Spread: $0.50", fill="#94a3b8", font=("Consolas", 8), anchor="e")
 
-        # Bids
         for i in range(1, 4):
             p = self.spot - i * 0.50
             lots = 2 + i * 2
@@ -442,7 +482,6 @@ class TradisApp:
         self.canvas.create_text(x0 + 12, y0 + 16, text="FINCOR GREEKS & RISK HEDGER", fill="#818cf8", font=("Segoe UI", 10, "bold"), anchor="w")
         self.canvas.create_text(x0 + w - 12, y0 + 16, text="Black-76", fill="#64748b", font=("Consolas", 8), anchor="e")
 
-        # Gauges
         g_data = [
             ("Delta (Δ)", f"{self.greeks['delta']:.4f}", self.greeks['delta'], "#10b981"),
             ("Gamma (Γ)", f"{self.greeks['gamma']:.4f}", min(1.0, self.greeks['gamma'] * 100), "#38bdf8"),
@@ -456,12 +495,10 @@ class TradisApp:
             self.canvas.create_text(x0 + 18, gy + 16, text=label, fill="#94a3b8", font=("Segoe UI", 9))
             self.canvas.create_text(x0 + w - 18, gy + 16, text=val_str, fill=color, font=("Consolas", 10, "bold"), anchor="e")
             
-            # Progress meter bar
             bar_w = w - 36
             self.canvas.create_rectangle(x0 + 18, gy + 34, x0 + 18 + bar_w, gy + 40, fill="#1e293b", outline="")
             self.canvas.create_rectangle(x0 + 18, gy + 34, x0 + 18 + (bar_w * max(0.05, min(1.0, ratio))), gy + 40, fill=color, outline="")
 
-        # Invariant Verification Box
         inv_y = y0 + 320
         self.canvas.create_rectangle(x0 + 10, inv_y, x0 + w - 10, inv_y + 190, fill="#022c22", outline="#059669")
         self.canvas.create_text(x0 + 18, inv_y + 18, text="CORDIS INVARIANTS (VERIFIED)", fill="#34d399", font=("Segoe UI", 9, "bold"), anchor="w")
@@ -485,11 +522,9 @@ class TradisApp:
         cols = ["Order ID", "Timestamp", "Symbol", "Side", "Quantity", "Fill Price", "Status", "Execution Engine"]
         col_w = w / len(cols)
         
-        # Header
         for c_idx, col in enumerate(cols):
             self.canvas.create_text(x0 + c_idx * col_w + 10, y0 + 36, text=col, fill="#64748b", font=("Segoe UI", 8, "bold"), anchor="w")
 
-        # Rows
         for r_idx, o in enumerate(self.orders[:5]):
             ry = y0 + 58 + r_idx * 18
             c = "#10b981" if o["side"] == "BUY" else "#f43f5e"
@@ -518,21 +553,18 @@ class TradisApp:
             ("Node 8: Margin Invariant Guard", f"Free Margin: ${self.account['free_margin']:,.2f}", "#10b981", 700, 340)
         ]
 
-        # Draw DAG Edges
         edges = [(0, 1), (1, 2), (1, 3), (0, 4), (4, 5), (0, 6), (6, 7)]
         for src, dst in edges:
             sx, sy = nodes[src][3] + 100, nodes[src][4] + 25
             dx, dy = nodes[dst][3] - 100, nodes[dst][4] + 25
             self.canvas.create_line(x0 + sx, y0 + sy, x0 + dx, y0 + dy, fill="#334155", width=2, arrow=tk.LAST)
 
-        # Draw DAG Nodes
         for title, desc, color, nx, ny in nodes:
             bx, by = x0 + nx, y0 + ny
             self.canvas.create_rectangle(bx - 100, by, bx + 100, by + 50, fill="#0f172a", outline=color, width=1.5)
             self.canvas.create_text(bx, by + 16, text=title, fill="#ffffff", font=("Segoe UI", 9, "bold"))
             self.canvas.create_text(bx, by + 34, text=desc, fill=color, font=("Consolas", 8))
 
-        # Incremental Telemetry Box
         t_y = y0 + 440
         self.canvas.create_rectangle(x0 + 40, t_y, x0 + w - 40, t_y + 180, fill="#0f172a", outline="#10b981", width=1)
         self.canvas.create_text(x0 + 60, t_y + 24, text="INCREMENTAL GRAPH PERFORMANCE TELEMETRY", fill="#10b981", font=("Segoe UI", 10, "bold"), anchor="w")
@@ -549,21 +581,22 @@ class TradisApp:
             self.canvas.create_text(x0 + w - 60, my, text=m_val, fill="#38bdf8", font=("Consolas", 9, "bold"), anchor="e")
 
     def engine_loop(self):
-        # Step market tick
         if self.is_running and time.time() - self.last_tick_time > 0.4:
             self.step_market()
             self.last_tick_time = time.time()
 
-        # Update Header Uptime
         uptime = int(time.time() - self.start_time)
         hrs, rem = divmod(uptime, 3600)
         mins, secs = divmod(rem, 60)
         self.lbl_stats.configure(text=f"Uptime: {hrs:02d}:{mins:02d}:{secs:02d} • Ticks: {self.tick_count:,} • Memory: O(1) [500 Slots]")
 
-        # Render Canvas
-        self.render_canvas()
+        # Update Live-Sync Badge
+        if time.time() - self.live_sync_time < 3.0:
+            self.lbl_sync_badge.configure(text=self.live_sync_msg, fg="#ffffff", bg="#059669")
+        else:
+            self.lbl_sync_badge.configure(text="CORDIS LIVE-SYNC ACTIVE", fg="#10b981", bg="#064e3b")
 
-        # Schedule next frame in 33ms (~30 FPS)
+        self.render_canvas()
         self.root.after(33, self.engine_loop)
 
 if __name__ == "__main__":
