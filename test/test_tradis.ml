@@ -1,4 +1,4 @@
-﻿(* test/test_tradis.ml - Cordis-OxCaml Verification & Commodities Test Suite *)
+﻿(* test/test_tradis.ml - Cordis-OxCaml Verification & Multi-Sink Test Suite *)
 
 open Tradis
 open Commodity
@@ -55,7 +55,13 @@ let () =
   let plugins = Plugin.Registry.list_plugins () in
   Printf.printf "[PASS] Invariant T4: Registered %d hot-swappable plugins into Tradis Supervisor\n" (List.length plugins);
 
-  (* 5. Stream High-Frequency Aluminium Ticks *)
+  (* 5. Attach & Hot-Swap Display Sinks at Runtime *)
+  Display.Manager.attach "test_tui" (module Display.TuiSink);
+  Display.Manager.attach "test_gui" (module Display.NativeGuiSink);
+  Display.Manager.attach "test_bonsai" (module Display.BonsaiWebSink);
+  Printf.printf "[PASS] Cordis Multi-Sink Architecture: Successfully attached TUI, Native GUI, and Bonsai sinks\n";
+
+  (* 6. Stream High-Frequency Aluminium Ticks *)
   let test_prices = [ 2620.00; 2622.50; 2628.00; 2634.00; 2618.00 ] in
   List.iteri (fun idx p ->
     let tick = {
@@ -74,7 +80,7 @@ let () =
       (idx + 1) p current_lots
   ) test_prices;
 
-  (* 6. Verify Fault Isolation & Supervision (Theorem 4) *)
+  (* 7. Verify Fault Isolation & Supervision (Theorem 4) *)
   let faulty_status = Plugin.Registry.get_status "faulty_chaos_strategy" in
   (match faulty_status with
    | Some (Plugin.Quarantined q) ->

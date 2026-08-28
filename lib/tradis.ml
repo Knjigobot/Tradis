@@ -8,3 +8,4 @@ module Plugin = Plugin
 module Engine = Engine
 module FincorGreeks = Fincor_plugin
 module BollingerPlugin = Bollinger_plugin
+module Display = Display
