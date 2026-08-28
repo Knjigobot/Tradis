@@ -9,3 +9,6 @@ module Engine = Engine
 module FincorGreeks = Fincor_plugin
 module BollingerPlugin = Bollinger_plugin
 module Display = Display
+module Vdom = Vdom
+module BonsaiUi = Bonsai_ui
+module TuiRender = Tui_render
