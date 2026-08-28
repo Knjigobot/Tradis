@@ -1,0 +1,10 @@
+﻿# Force GitHub Linguist to recognize pure OCaml & Agda
+*.ml linguist-language=OCaml
+*.mli linguist-language=OCaml
+*.agda linguist-language=Agda
+*.rzk linguist-language=Rzk
+*.opam linguist-detectable=false
+dune linguist-detectable=false
+dune-project linguist-detectable=false
+.gitignore linguist-detectable=false
+README.md linguist-documentation=true
