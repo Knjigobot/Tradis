@@ -1,0 +1,17 @@
+# Environment & Secrets
+.env
+*.env
+apikeys/
+*.key
+*.token
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Python & IDE
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+
