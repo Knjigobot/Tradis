@@ -6,6 +6,7 @@ import { PluginSupervisor } from '../core/supervisor.js';
 import { TradingEngine } from '../core/engine.js';
 import { initCordisLiveSync } from '../core/live_sync.js';
 import { FincorGreeksPlugin } from '../plugins/fincor_greeks.js';
+import { BollingerBandsPlugin } from '../plugins/bollinger_bands.js';
 import { generateCommodityDataset, generateLiveCommodityTick, parseCSVDataset } from '../data/generator.js';
 import { ChartRenderer } from './chart.js';
 
@@ -20,11 +21,14 @@ export class TradisApp {
     this.tickHistory = [];
     this.filtrationIndex = 0;
 
-    // Register Fincor Greeks Hedging Plugin
+    // Register Fincor Formalized Plugins
     this.greeksPlugin = new FincorGreeksPlugin();
+    this.bollingerPlugin = new BollingerBandsPlugin({ period: 20, k: 2.0 });
+    
     this.supervisor.register(this.greeksPlugin);
+    this.supervisor.register(this.bollingerPlugin);
 
-    // Setup Canvas Chart (Bollinger Bands visually removed)
+    // Setup Canvas Chart
     const canvas = document.getElementById('main-chart-canvas');
     this.chart = new ChartRenderer(canvas, this.engine, this.context);
 
@@ -82,11 +86,19 @@ export class TradisApp {
       });
     });
 
-    // Indicator toggle
+    // Indicator toggles
     const emaCheck = document.getElementById('check-ema');
     if (emaCheck) {
       emaCheck.addEventListener('change', (e) => {
         this.chart.showEMA = e.target.checked;
+        this.chart.render();
+      });
+    }
+
+    const bbCheck = document.getElementById('check-bollinger');
+    if (bbCheck) {
+      bbCheck.addEventListener('change', (e) => {
+        this.chart.showBollinger = e.target.checked;
         this.chart.render();
       });
     }
@@ -141,6 +153,8 @@ export class TradisApp {
     window.hotReloadPlugin = (pluginId) => {
       if (pluginId === 'fincor_greeks_hedger') {
         this.supervisor.hotReload(new FincorGreeksPlugin());
+      } else if (pluginId === 'fincor_bollinger_bands') {
+        this.supervisor.hotReload(new BollingerBandsPlugin({ period: 20, k: 2.0 }));
       }
     };
 
@@ -205,6 +219,17 @@ export class TradisApp {
     document.getElementById('greek-gamma-val').textContent = greeks.gamma.toFixed(4);
     document.getElementById('greek-vega-val').textContent = greeks.vega.toFixed(2);
     document.getElementById('greek-theta-val').textContent = greeks.theta.toFixed(2);
+
+    // Bollinger Bands Display
+    const bb = this.context.get('bollinger_bands');
+    if (bb) {
+      const bbUpperEl = document.getElementById('bb-upper-val');
+      const bbLowerEl = document.getElementById('bb-lower-val');
+      const bbBwEl = document.getElementById('bb-bw-val');
+      if (bbUpperEl) bbUpperEl.textContent = `$${bb.upper.toFixed(2)}`;
+      if (bbLowerEl) bbLowerEl.textContent = `$${bb.lower.toFixed(2)}`;
+      if (bbBwEl) bbBwEl.textContent = `${(bb.bandwidth * 100).toFixed(2)}%`;
+    }
 
     // Ledger & Positions
     const acc = this.engine.account;
