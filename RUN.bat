@@ -1,3 +1,4 @@
 ﻿@echo off
+title TRADIS - Cordis-OxCaml Commodities Platform
 cd /d "%~dp0"
-python runner.py
+dune exec tradis --watch
