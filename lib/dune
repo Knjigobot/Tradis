@@ -1,0 +1,4 @@
+(library
+ (name tradis)
+ (public_name tradis)
+ (libraries fincor))

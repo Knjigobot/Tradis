@@ -1,0 +1,7 @@
+(lang dune 3.10)
+(name tradis)
+(version 0.1.0)
+(generate_opam_files true)
+(license MIT)
+(authors "Knjigobot <ai@reasonix.dev>")
+(maintainers "Knjigobot <ai@reasonix.dev>")

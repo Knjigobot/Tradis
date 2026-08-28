@@ -1,0 +1,24 @@
+opam-version: "2.0"
+synopsis: "Cordis-Style Non-Stop High-Availability Trading Runtime in OxCaml"
+description: "A 24/7/365 resilient trading engine runtime with hot-swappable plugins and Fincor quant integration"
+maintainer: ["Knjigobot <ai@reasonix.dev>"]
+authors: ["Knjigobot <ai@reasonix.dev>"]
+license: "MIT"
+depends: [
+  "ocaml" {>= "5.0.0"}
+  "dune" {>= "3.10"}
+  "fincor"
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+    "@runtest" {with-test}
+  ]
+]
