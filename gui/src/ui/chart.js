@@ -1,5 +1,5 @@
 ﻿/**
- * Tradis UI: Canvas Candlestick & Volume Chart Renderer for Commodity Futures
+ * Tradis UI: Canvas Candlestick, Volume & Bollinger Bands Chart Renderer
  */
 export class ChartRenderer {
   constructor(canvas, engine, context) {
@@ -9,9 +9,8 @@ export class ChartRenderer {
     this.context = context;
     this.activeTimeframe = 'M1';
     this.showEMA = true;
-    this.showGreeks = true;
+    this.showBollinger = true;
 
-    // Attach ResizeObserver to guarantee crisp high-DPI rendering
     const parent = this.canvas.parentElement;
     if (parent && window.ResizeObserver) {
       const ro = new ResizeObserver(() => this.render());
@@ -92,6 +91,78 @@ export class ChartRenderer {
     }
 
     const emaPoints = [];
+    const upperBandPoints = [];
+    const lowerBandPoints = [];
+    const midBandPoints = [];
+
+    // Calculate rolling 20-period Bollinger Bands for each visible bar
+    if (this.showBollinger) {
+      visibleBars.forEach((_, idx) => {
+        const fullIdx = bars.length - visibleBars.length + idx;
+        if (fullIdx >= 19) {
+          const windowBars = bars.slice(fullIdx - 19, fullIdx + 1);
+          const mean = windowBars.reduce((sum, b) => sum + b.close, 0) / 20.0;
+          const variance = windowBars.reduce((sum, b) => sum + Math.pow(b.close - mean, 2), 0) / 20.0;
+          const stdev = Math.sqrt(variance);
+          const upper = mean + 2.0 * stdev;
+          const lower = mean - 2.0 * stdev;
+
+          const x = idx * barWidth + barWidth / 2;
+          const upperY = chartH - ((upper - minPrice) / (maxPrice - minPrice)) * chartH;
+          const lowerY = chartH - ((lower - minPrice) / (maxPrice - minPrice)) * chartH;
+          const midY = chartH - ((mean - minPrice) / (maxPrice - minPrice)) * chartH;
+
+          upperBandPoints.push({ x, y: upperY });
+          lowerBandPoints.push({ x, y: lowerY });
+          midBandPoints.push({ x, y: midY });
+        }
+      });
+    }
+
+    // Draw Bollinger Bands Shaded Area
+    if (this.showBollinger && upperBandPoints.length > 1) {
+      this.ctx.fillStyle = 'rgba(168, 85, 247, 0.08)';
+      this.ctx.beginPath();
+      upperBandPoints.forEach((pt, i) => {
+        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
+        else this.ctx.lineTo(pt.x, pt.y);
+      });
+      for (let i = lowerBandPoints.length - 1; i >= 0; i--) {
+        this.ctx.lineTo(lowerBandPoints[i].x, lowerBandPoints[i].y);
+      }
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      // Draw Upper Band
+      this.ctx.strokeStyle = '#a855f7';
+      this.ctx.lineWidth = 1.2;
+      this.ctx.beginPath();
+      upperBandPoints.forEach((pt, i) => {
+        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
+        else this.ctx.lineTo(pt.x, pt.y);
+      });
+      this.ctx.stroke();
+
+      // Draw Lower Band
+      this.ctx.beginPath();
+      lowerBandPoints.forEach((pt, i) => {
+        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
+        else this.ctx.lineTo(pt.x, pt.y);
+      });
+      this.ctx.stroke();
+
+      // Draw Middle Band (Dashed)
+      this.ctx.strokeStyle = '#c084fc';
+      this.ctx.lineWidth = 1.0;
+      this.ctx.setLineDash([3, 3]);
+      this.ctx.beginPath();
+      midBandPoints.forEach((pt, i) => {
+        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
+        else this.ctx.lineTo(pt.x, pt.y);
+      });
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+    }
 
     // 2. Draw Candlesticks & Volume Bars
     visibleBars.forEach((b, idx) => {
@@ -118,7 +189,7 @@ export class ChartRenderer {
       const bodyH = Math.max(2, Math.abs(closeY - openY));
       this.ctx.fillRect(x - barWidth * 0.35, bodyTop, barWidth * 0.7, bodyH);
 
-      // Volume Bar (bottom 35px)
+      // Volume Bar
       const volH = maxVol > 0 ? (b.volume / maxVol) * 35 : 0;
       this.ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.35)' : 'rgba(244, 63, 94, 0.35)';
       this.ctx.fillRect(x - barWidth * 0.35, h - volH - 4, barWidth * 0.7, volH);
