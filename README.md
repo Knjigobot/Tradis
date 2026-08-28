@@ -17,7 +17,7 @@ Specialized for **Non-Precious Commodities Futures** (LME Primary Aluminium, Cop
 |  - Zero-Copy Dynamic Observable Coeffects     |  - Multi-Timeframe Bounded Bar Aggregator     |
 |  - Reversible History & Time-Series Buffers   |  - Deterministic Event Causality              |
 +-----------------------------------------------------------------------------------------------+
-|  HOT-SWAPPABLE PLUGIN REGISTRY & SUPERVISOR (Erlang/OTP Fault Isolation in Pure OxCaml)       |
+|  HOT-SWAPPABLE PLUGIN REGISTRY & SUPERVISOR (Cordis Spatiotemporal Scope Isolation)       |
 |  - Dynamic Register / Unregister / Hot-Reload at runtime without engine downtime              |
 |  - Rogue strategy exception sandboxing & automated quarantine (Zero Engine Crashes)           |
 +-----------------------------------------------------------------------------------------------+
@@ -50,7 +50,7 @@ Tradis formalizes all five core invariants using **Cubical Agda (`--cubical`)** 
    * *Formalization*: Preserved bounds under push operations in [`formal/TradisInvariant.agda`](formal/TradisInvariant.agda).
 
 4. **Theorem 4: Supervisory Fault Containment (`Tradis.Plugin`)**
-   * Erlang/OTP supervisor pattern in pure OxCaml. Rogue strategies are quarantined upon unhandled exceptions with 0% runtime engine downtime.
+   * Cordis Spatiotemporal Scope & Registry supervisor in pure OxCaml. Rogue strategies are quarantined upon unhandled exceptions with 0% runtime engine downtime.
 
 5. **Theorem 5: Conservation of Portfolio State (Self-Financing Invariant)**
    * Enforces $\Delta V_t = \sum \phi_i dS_i + d\text{Cash}_t = 0$.

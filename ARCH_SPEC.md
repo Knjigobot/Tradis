@@ -44,7 +44,7 @@ The system is founded upon **Cordis Spatiotemporal Composability** and **OxCaml*
    * Pre-allocated circular ring buffers (500 slots/timeframe) enforce strictly bounded resident memory across multi-year infinite streaming with 0% GC growth.
    * Verified constructively in `formal/TradisInvariant.agda` and amortized in Corplex ($\Phi$ potential).
 
-4. **Theorem 4: Erlang-Style Supervisory Fault Containment (`Tradis.Plugin`)**
+4. **Theorem 4: Cordis Spatiotemporal Scope Isolation & Fault Quarantine (`Tradis.Plugin`)**
    * Fault isolation in pure OxCaml. Unhandled strategy exceptions (e.g. division-by-zero singularities) are caught and automatically quarantined without crashing or stopping the core market engine.
 
 5. **Theorem 5: Conservation of Portfolio Wealth (Self-Financing Invariant)**
