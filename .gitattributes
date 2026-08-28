@@ -8,5 +8,3 @@ dune linguist-detectable=false
 dune-project linguist-detectable=false
 .gitignore linguist-detectable=false
 README.md linguist-documentation=true
-RUN.bat linguist-detectable=false
-runner.py linguist-detectable=false
