@@ -33,8 +33,9 @@
         <span>Memory Bound: <strong class="text-sky-400 font-mono">O(1) [500 Slots]</strong></span>
       </div>
       <div class="h-4 w-px bg-slate-700 mx-2"></div>
-      <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-        CORDIS NATIVE HMR ACTIVE
+      <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center space-x-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>⚡ ZERO-F5 LIVE AUTO-SYNC</span>
       </span>
     </div>
 
@@ -253,17 +254,26 @@
 
   <script>
     // =========================================================================
-    // NATIVE CORDIS-OXCAML HMR & EVENT STREAM RECEIVER
+    // CONTINUOUS ZERO-F5 AUTO-SYNC ENGINE
     // =========================================================================
-    if (window.EventSource) {
+    let lastContentHash = null;
+    async function liveSyncCheck() {
       try {
-        const es = new EventSource('/events');
-        es.addEventListener('hmr_patch', (e) => {
-          console.log('[CORDIS HMR] Hot module patch received from OxCaml kernel:', e.data);
-          updateUI();
-        });
+        const cleanUrl = window.location.href.split('?')[0];
+        const res = await fetch(cleanUrl + '?t=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          const hash = text.length + '_' + text.slice(0, 100);
+          if (lastContentHash === null) {
+            lastContentHash = hash;
+          } else if (lastContentHash !== hash) {
+            lastContentHash = hash;
+            window.location.reload();
+          }
+        }
       } catch (_) {}
     }
+    setInterval(liveSyncCheck, 250);
 
     // =========================================================================
     // LIVE COMMODITIES TRADING ENGINE (OXCAML BACKED)
