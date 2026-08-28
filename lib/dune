@@ -1,4 +1,4 @@
-(library
+﻿(library
  (name tradis)
  (public_name tradis)
- (libraries fincor))
+ (libraries fincor cordis_core cordis_system))

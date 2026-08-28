@@ -1,4 +1,4 @@
 ﻿(executable
  (name main)
  (public_name tradis)
- (libraries tradis fincor))
+ (libraries tradis fincor cordis_core cordis_system))
