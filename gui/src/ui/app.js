@@ -4,6 +4,7 @@
 import { ContextManifold } from '../core/context.js';
 import { PluginSupervisor } from '../core/supervisor.js';
 import { TradingEngine } from '../core/engine.js';
+import { initCordisLiveSync } from '../core/live_sync.js';
 import { FincorGreeksPlugin } from '../plugins/fincor_greeks.js';
 import { generateCommodityDataset, generateLiveCommodityTick, parseCSVDataset } from '../data/generator.js';
 import { ChartRenderer } from './chart.js';
@@ -33,12 +34,17 @@ export class TradisApp {
     this.bindUIEvents();
     this.updateUI();
     this.startLiveHeartbeat();
+
+    // Enable Cordis Zero-Refresh Live Sync
+    initCordisLiveSync((file) => {
+      this.supervisor.logAudit(`[CORDIS LIVE SYNC] Hot-reloaded modified component: ${file}`);
+      window.location.reload();
+    });
   }
 
   seedInitialHistoricalData(symbol) {
     const historicalBars = generateCommodityDataset(symbol, 120);
     historicalBars.forEach(b => {
-      // Seed directly into ring buffer
       this.engine.ringBuffers['M1'].push(b);
       this.engine.currentBars['M1'] = b;
     });
