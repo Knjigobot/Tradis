@@ -35,7 +35,7 @@
       </div>
     </div>
 
-    <!-- Playback & Time-Travel Controls (Temporal Composability) -->
+    <!-- Playback Controls -->
     <div class="flex items-center space-x-3">
       <div class="flex items-center bg-slate-950 rounded-lg border border-slate-800 p-0.5">
         <button id="btn-play-pause" title="Play/Pause Engine" class="px-3 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded shadow-sm">⏸ Pause</button>
@@ -178,11 +178,6 @@
             <input type="checkbox" id="check-ema" checked class="rounded border-slate-700 text-indigo-600">
             <span>EMA 20</span>
           </label>
-          
-          <label class="flex items-center space-x-1 text-xs text-purple-300 cursor-pointer">
-            <input type="checkbox" id="check-bollinger" checked class="rounded border-purple-700 text-purple-600">
-            <span class="font-semibold">Bollinger Bands (20, 2)</span>
-          </label>
         </div>
 
         <!-- Real-Time Cursor Stats (Price + Greek) -->
@@ -256,7 +251,7 @@
 
           <!-- TAB 3: PLUGINS -->
           <div id="tab-plugins" class="hidden space-y-2">
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-2">
               
               <!-- Fincor Greeks Hedger -->
               <div class="p-2 rounded border border-indigo-500/40 bg-indigo-500/10 flex justify-between items-center">
@@ -267,18 +262,6 @@
                 <div class="flex items-center space-x-2">
                   <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ACTIVE</span>
                   <button class="px-2 py-0.5 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white rounded" onclick="hotReloadPlugin('fincor_greeks_hedger')">Reload</button>
-                </div>
-              </div>
-
-              <!-- Fincor Bollinger Bands Plugin -->
-              <div class="p-2 rounded border border-purple-500/40 bg-purple-500/10 flex justify-between items-center">
-                <div>
-                  <div class="font-bold text-white">Fincor Bollinger Bands</div>
-                  <div class="text-[10px] text-slate-400">id: fincor_bollinger_bands &bull; (20, 2.0)</div>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30">ACTIVE</span>
-                  <button class="px-2 py-0.5 text-[10px] bg-purple-600 hover:bg-purple-500 text-white rounded" onclick="hotReloadPlugin('fincor_bollinger_bands')">Reload</button>
                 </div>
               </div>
 
@@ -301,7 +284,6 @@
           <div id="tab-logs" class="hidden space-y-1 text-[11px] overflow-y-auto max-h-32">
             <div id="audit-log-entries" class="space-y-0.5">
               <div class="text-emerald-400">[INFO] Tradis Commodities Engine initialized. LME Aluminium feeds online.</div>
-              <div class="text-purple-400">[INFO] Fincor Bollinger Bands (20, 2.0) Plugin registered &amp; active.</div>
               <div class="text-sky-400">[INFO] Connected to Fincor Commodity Options Kernel.</div>
               <div class="text-indigo-400">[INFO] Bounded ring buffer initialized with capacity 500. Zero GC leak mode engaged.</div>
             </div>
@@ -311,31 +293,9 @@
       </div>
     </main>
 
-    <!-- RIGHT PANEL: Commodity Greeks, Bollinger & Account Summary -->
+    <!-- RIGHT PANEL: Commodity Greeks & Account Summary -->
     <aside class="w-64 border-l border-slate-800 bg-slate-900 flex flex-col flex-shrink-0">
       
-      <!-- Fincor Bollinger Bands Metrics Panel -->
-      <div class="p-3 border-b border-slate-800">
-        <div class="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-2 flex items-center justify-between">
-          <span>Bollinger Volatility</span>
-          <span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono">20, 2.0</span>
-        </div>
-        <div class="space-y-1 text-xs font-mono">
-          <div class="flex justify-between text-slate-400">
-            <span>Upper Band:</span>
-            <strong id="bb-upper-val" class="text-purple-300">$2,634.50</strong>
-          </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Lower Band:</span>
-            <strong id="bb-lower-val" class="text-purple-300">$2,614.50</strong>
-          </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Bandwidth:</span>
-            <strong id="bb-bw-val" class="text-sky-400">0.76%</strong>
-          </div>
-        </div>
-      </div>
-
       <!-- Fincor Commodity Options Greeks Panel -->
       <div class="p-3 border-b border-slate-800">
         <div class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-2 flex items-center justify-between">

@@ -1,4 +1,4 @@
-﻿// Zero-dependency HTTP Server & Cordis Real-Time Live Sync Engine
+﻿// Zero-dependency HTTP Server & Cordis Dual-Channel Live Sync Engine
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +6,8 @@ const { exec } = require('child_process');
 
 const PORT = process.env.PORT || 8088;
 const BASE_DIR = __dirname;
+
+let currentVersion = Date.now();
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -17,53 +19,72 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml'
 };
 
-// Connected browser clients for Cordis Live-Sync
 const sseClients = new Set();
 
 function broadcastLiveUpdate(changedFile) {
-  const msg = JSON.stringify({ type: 'hot_reload', file: changedFile, timestamp: Date.now() });
+  currentVersion = Date.now();
+  const payload = JSON.stringify({ type: 'hot_reload', file: changedFile, version: currentVersion });
+  
   sseClients.forEach(res => {
     try {
-      res.write(`data: ${msg}\n\n`);
+      res.write(`event: hot_reload\ndata: ${payload}\n\n`);
+      res.write(`data: ${payload}\n\n`);
     } catch (_) {
       sseClients.delete(res);
     }
   });
 }
 
-// Watch directory for changes with debouncing
+// Watch directory for changes
 let debounceTimer = null;
 fs.watch(BASE_DIR, { recursive: true }, (eventType, filename) => {
   if (filename && !filename.includes('.git') && !filename.includes('node_modules')) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      console.log(`[CORDIS LIVE SYNC] Detected edit in: ${filename} -> Broadcasting update to browser.`);
+      console.log(`[CORDIS LIVE SYNC] File modified: ${filename} -> Broadcasting live reload.`);
       broadcastLiveUpdate(filename);
-    }, 150);
+    }, 100);
   }
 });
 
 const server = http.createServer((req, res) => {
   let reqPath = req.url.split('?')[0];
 
-  // 1. Cordis SSE Live-Sync Endpoint
+  // 1. Version Heartbeat Endpoint (Guaranteed Fallback)
+  if (reqPath === '/_cordis_version') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    });
+    res.end(JSON.stringify({ version: currentVersion }));
+    return;
+  }
+
+  // 2. SSE Live-Sync Endpoint
   if (reqPath === '/_cordis_live') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*'
+      'Access-Control-Allow-Origin': '*',
+      'X-Accel-Buffering': 'no'
     });
-    res.write('data: {"type":"connected","status":"ready"}\n\n');
+    res.write(`data: ${JSON.stringify({ type: 'connected', version: currentVersion })}\n\n`);
     sseClients.add(res);
 
+    // Keep-alive heartbeat ping every 10s
+    const keepAlive = setInterval(() => {
+      try { res.write(': ping\n\n'); } catch (_) { clearInterval(keepAlive); }
+    }, 10000);
+
     req.on('close', () => {
+      clearInterval(keepAlive);
       sseClients.delete(res);
     });
     return;
   }
 
-  // 2. Static File Serving
+  // 3. Static File Serving
   if (reqPath === '/') reqPath = '/index.html';
 
   const filePath = path.join(BASE_DIR, reqPath);
@@ -82,7 +103,9 @@ const server = http.createServer((req, res) => {
     } else {
       res.writeHead(200, { 
         'Content-Type': contentType, 
-        'Cache-Control': 'no-cache, no-store, must-revalidate' 
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       });
       res.end(content);
     }
@@ -91,12 +114,9 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
-  console.log(`\n======================================================`);
+  console.log(`======================================================`);
   console.log(` TRADIS COMMODITIES DESKTOP PLATFORM (CORDIS RUNTIME)`);
   console.log(` Live Server: ${url}`);
-  console.log(` Cordis Real-Time Live Sync: ENABLED (Zero-Refresh)`);
-  console.log(`======================================================\n`);
-
-  const startCmd = process.platform === 'win32' ? `start ${url}` : `open ${url}`;
-  exec(startCmd);
+  console.log(` Cordis Real-Time Live Sync: ACTIVE (Dual-Channel)`);
+  console.log(`======================================================`);
 });

@@ -1,6 +1,6 @@
 ﻿/**
- * Tradis UI: Canvas Candlestick, Volume & Bollinger Bands Chart Renderer
- * Enhanced with auto-scaling for volatility channels and high-visibility styling.
+ * Tradis UI: Canvas Candlestick & Volume Chart Renderer
+ * (Bollinger Bands visually removed as requested)
  */
 export class ChartRenderer {
   constructor(canvas, engine, context) {
@@ -10,7 +10,7 @@ export class ChartRenderer {
     this.context = context;
     this.activeTimeframe = 'M1';
     this.showEMA = true;
-    this.showBollinger = true;
+    this.showBollinger = false; // VISUALLY REMOVED
 
     const parent = this.canvas.parentElement;
     if (parent && window.ResizeObserver) {
@@ -53,44 +53,17 @@ export class ChartRenderer {
     const visibleBars = bars.slice(-70);
     const numBars = visibleBars.length;
 
-    // Pre-calculate Bollinger Bands for all visible bars
-    const bbData = [];
-    visibleBars.forEach((_, idx) => {
-      const fullIdx = bars.length - visibleBars.length + idx;
-      if (fullIdx >= 19) {
-        const windowBars = bars.slice(fullIdx - 19, fullIdx + 1);
-        const mean = windowBars.reduce((sum, b) => sum + b.close, 0) / 20.0;
-        const variance = windowBars.reduce((sum, b) => sum + Math.pow(b.close - mean, 2), 0) / 20.0;
-        const stdev = Math.sqrt(variance);
-        bbData.push({
-          idx,
-          mean,
-          upper: mean + 2.0 * stdev,
-          lower: mean - 2.0 * stdev,
-          stdev
-        });
-      } else {
-        bbData.push(null);
-      }
-    });
-
-    // Determine min/max bounding box including Bollinger Bands
     let minPrice = Infinity;
     let maxPrice = -Infinity;
     let maxVol = 0;
 
-    visibleBars.forEach((b, i) => {
+    visibleBars.forEach((b) => {
       if (b.low < minPrice) minPrice = b.low;
       if (b.high > maxPrice) maxPrice = b.high;
       if (b.volume > maxVol) maxVol = b.volume;
-
-      if (this.showBollinger && bbData[i]) {
-        if (bbData[i].lower < minPrice) minPrice = bbData[i].lower;
-        if (bbData[i].upper > maxPrice) maxPrice = bbData[i].upper;
-      }
     });
 
-    const padding = (maxPrice - minPrice) * 0.10 || 1.5;
+    const padding = (maxPrice - minPrice) * 0.12 || 1.5;
     minPrice -= padding;
     maxPrice += padding;
 
@@ -118,75 +91,8 @@ export class ChartRenderer {
     }
 
     const emaPoints = [];
-    const upperPoints = [];
-    const lowerPoints = [];
-    const midPoints = [];
 
-    // Collect Bollinger Coordinate Points
-    if (this.showBollinger) {
-      bbData.forEach((bb, i) => {
-        if (bb) {
-          const x = i * barWidth + barWidth / 2;
-          const upperY = chartH - ((bb.upper - minPrice) / (maxPrice - minPrice)) * chartH;
-          const lowerY = chartH - ((bb.lower - minPrice) / (maxPrice - minPrice)) * chartH;
-          const midY = chartH - ((bb.mean - minPrice) / (maxPrice - minPrice)) * chartH;
-
-          upperPoints.push({ x, y: upperY });
-          lowerPoints.push({ x, y: lowerY });
-          midPoints.push({ x, y: midY });
-        }
-      });
-    }
-
-    // 2. Draw Bollinger Bands (Vibrant Purple Volatility Channel)
-    if (this.showBollinger && upperPoints.length > 1) {
-      // Shaded Channel
-      this.ctx.fillStyle = 'rgba(168, 85, 247, 0.12)';
-      this.ctx.beginPath();
-      upperPoints.forEach((pt, i) => {
-        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
-        else this.ctx.lineTo(pt.x, pt.y);
-      });
-      for (let i = lowerPoints.length - 1; i >= 0; i--) {
-        this.ctx.lineTo(lowerPoints[i].x, lowerPoints[i].y);
-      }
-      this.ctx.closePath();
-      this.ctx.fill();
-
-      // Upper Band Line
-      this.ctx.strokeStyle = '#c084fc';
-      this.ctx.lineWidth = 1.8;
-      this.ctx.beginPath();
-      upperPoints.forEach((pt, i) => {
-        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
-        else this.ctx.lineTo(pt.x, pt.y);
-      });
-      this.ctx.stroke();
-
-      // Lower Band Line
-      this.ctx.strokeStyle = '#c084fc';
-      this.ctx.lineWidth = 1.8;
-      this.ctx.beginPath();
-      lowerPoints.forEach((pt, i) => {
-        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
-        else this.ctx.lineTo(pt.x, pt.y);
-      });
-      this.ctx.stroke();
-
-      // Middle SMA Band Line (Dashed)
-      this.ctx.strokeStyle = '#e879f9';
-      this.ctx.lineWidth = 1.2;
-      this.ctx.setLineDash([4, 4]);
-      this.ctx.beginPath();
-      midPoints.forEach((pt, i) => {
-        if (i === 0) this.ctx.moveTo(pt.x, pt.y);
-        else this.ctx.lineTo(pt.x, pt.y);
-      });
-      this.ctx.stroke();
-      this.ctx.setLineDash([]);
-    }
-
-    // 3. Draw Candlesticks & Volume
+    // 2. Draw Candlesticks & Volume
     visibleBars.forEach((b, idx) => {
       const x = idx * barWidth + barWidth / 2;
       const openY = chartH - ((b.open - minPrice) / (maxPrice - minPrice)) * chartH;
@@ -219,7 +125,7 @@ export class ChartRenderer {
       emaPoints.push({ x, y: (openY + closeY) / 2 });
     });
 
-    // 4. Draw EMA 20 Overlay Line
+    // 3. Draw EMA 20 Overlay Line
     if (this.showEMA && emaPoints.length > 1) {
       this.ctx.strokeStyle = '#818cf8';
       this.ctx.lineWidth = 1.5;
@@ -229,16 +135,6 @@ export class ChartRenderer {
         else this.ctx.lineTo(pt.x, pt.y);
       });
       this.ctx.stroke();
-    }
-
-    // 5. On-Chart Live Indicator Legend
-    if (this.showBollinger && bbData.length > 0) {
-      const latestBB = bbData[bbData.length - 1];
-      if (latestBB) {
-        this.ctx.font = '10px monospace';
-        this.ctx.fillStyle = '#c084fc';
-        this.ctx.fillText(`BB(20, 2): Upper $${latestBB.upper.toFixed(2)} | Mid $${latestBB.mean.toFixed(2)} | Lower $${latestBB.lower.toFixed(2)}`, 12, 18);
-      }
     }
   }
 }
