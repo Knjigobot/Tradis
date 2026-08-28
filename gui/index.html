@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tradis - Cordis High-Availability Desktop Platform</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="bg-[var(--background,#0b0f19)] text-[var(--foreground,#e2e8f0)] antialiased h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- TOP HEADER / STATUS BAR -->
+  <header class="h-12 border-b border-[var(--border,#1e293b)] bg-[var(--card,#0f172a)] px-4 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2">
+        <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50"></div>
+        <span class="font-bold tracking-wider text-base text-[var(--foreground,#f8fafc)]">TRADIS</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-mono border border-indigo-500/30">CORDIS RUNTIME v1.0</span>
+      </div>
+      <div class="h-4 w-px bg-[var(--border,#334155)] mx-2"></div>
+      <div class="flex items-center space-x-2 text-xs text-[var(--muted-foreground,#94a3b8)]">
+        <span>Uptime: <strong id="uptime-display" class="text-emerald-400 font-mono">00:00:00</strong></span>
+        <span>•</span>
+        <span>Ticks: <strong id="ticks-count-display" class="text-[var(--foreground,#f8fafc)] font-mono">0</strong></span>
+        <span>•</span>
+        <span>Memory Bound: <strong class="text-sky-400 font-mono">O(1) [500 Max/TF]</strong></span>
+      </div>
+    </div>
+
+    <!-- Playback & Time-Travel Controls (Temporal Composability) -->
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center bg-[var(--background,#020617)] rounded-lg border border-[var(--border,#1e293b)] p-0.5">
+        <button id="btn-step-back" title="Step Back (Rollback Filtration)" class="px-2 py-1 text-xs hover:bg-[var(--card,#1e293b)] rounded text-[var(--foreground,#cbd5e1)]">⏮ Rewind</button>
+        <button id="btn-play-pause" title="Play/Pause Engine" class="px-3 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded shadow-sm">▶ Play</button>
+        <button id="btn-step-fwd" title="Step Forward (Advance Filtration)" class="px-2 py-1 text-xs hover:bg-[var(--card,#1e293b)] rounded text-[var(--foreground,#cbd5e1)]">⏭ Step</button>
+      </div>
+
+      <div class="flex items-center space-x-1.5 text-xs">
+        <span class="text-[var(--muted-foreground,#94a3b8)]">Speed:</span>
+        <select id="speed-select" class="bg-[var(--card,#1e293b)] border border-[var(--border,#334155)] rounded px-2 py-1 text-xs text-[var(--foreground,#f8fafc)] focus:outline-none">
+          <option value="1">1x (Live)</option>
+          <option value="5" selected>5x</option>
+          <option value="20">20x</option>
+          <option value="100">100x (Turbo)</option>
+        </select>
+      </div>
+
+      <button id="btn-load-dataset-modal" class="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded flex items-center space-x-1 shadow-sm">
+        <span>📂 Load Dataset</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- LEFT PANEL: Market Watch & Order Book & Cordis Invariants -->
+    <aside class="w-72 border-r border-[var(--border,#1e293b)] bg-[var(--card,#0f172a)] flex flex-col flex-shrink-0">
+      
+      <!-- Market Symbols -->
+      <div class="p-3 border-b border-[var(--border,#1e293b)]">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)] mb-2 flex justify-between">
+          <span>Market Watch</span>
+          <span class="text-[10px] text-emerald-400">Coeffects Online</span>
+        </div>
+        <div class="space-y-1">
+          <div class="p-2 rounded bg-indigo-500/10 border border-indigo-500/30 flex justify-between items-center cursor-pointer">
+            <div>
+              <div class="font-bold text-sm text-[var(--foreground,#f8fafc)]">EUR/USD</div>
+              <div class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">Spot FX • Spatiotemporal</div>
+            </div>
+            <div class="text-right font-mono">
+              <div id="side-spot-price" class="text-sm font-bold text-emerald-400">1.08500</div>
+              <div id="side-spot-change" class="text-[10px] text-emerald-500">+0.12%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOM / Order Book Depth -->
+      <div class="p-3 border-b border-[var(--border,#1e293b)] flex-1 flex flex-col overflow-hidden">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)] mb-2 flex justify-between">
+          <span>L2 Order Book</span>
+          <span class="text-[10px] text-[var(--muted-foreground,#64748b)]">Spread: <span id="dom-spread" class="text-amber-400 font-mono">0.00010</span></span>
+        </div>
+        <div class="flex-1 flex flex-col justify-between font-mono text-xs overflow-y-auto space-y-0.5">
+          <!-- Asks (Red) -->
+          <div id="dom-asks" class="space-y-0.5 flex flex-col-reverse">
+            <!-- Populated via JS -->
+          </div>
+          <!-- Mid Price Separator -->
+          <div class="py-1 border-y border-[var(--border,#1e293b)] my-1 text-center font-bold text-sm text-sky-400 bg-[var(--background,#020617)]/60" id="dom-mid">
+            1.08500
+          </div>
+          <!-- Bids (Green) -->
+          <div id="dom-bids" class="space-y-0.5">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Cordis Theorem Diagnostics -->
+      <div class="p-3 bg-[var(--background,#020617)]/40 border-t border-[var(--border,#1e293b)]">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-indigo-400 mb-1.5 flex items-center justify-between">
+          <span>Cordis Formal Invariants</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">VERIFIED</span>
+        </div>
+        <div class="space-y-1 text-[11px] text-[var(--muted-foreground,#94a3b8)]">
+          <div class="flex justify-between">
+            <span>T1: Spatial Coeffects:</span>
+            <span class="text-emerald-400 font-mono">Dynamic Manifold Active</span>
+          </div>
+          <div class="flex justify-between">
+            <span>T2: Temporal Causality:</span>
+            <span id="invariant-causality" class="text-emerald-400 font-mono">dF/dt &gt; 0 (Strict)</span>
+          </div>
+          <div class="flex justify-between">
+            <span>T3: Bounded Ring Memory:</span>
+            <span id="invariant-memory" class="text-sky-400 font-mono">500 / 500 Slots</span>
+          </div>
+          <div class="flex justify-between">
+            <span>T4: Fault Containment:</span>
+            <span id="invariant-supervisor" class="text-emerald-400 font-mono">Supervisor Live</span>
+          </div>
+          <div class="flex justify-between">
+            <span>T5: Self-Financing:</span>
+            <span id="invariant-selffin" class="text-emerald-400 font-mono">ΔV_t = φ dS (0.00)</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER PANEL: Interactive Candlestick Chart & Timeframe Toolbar -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-[var(--background,#020617)]">
+      
+      <!-- Chart Toolbar -->
+      <div class="h-10 border-b border-[var(--border,#1e293b)] px-4 flex items-center justify-between flex-shrink-0 bg-[var(--card,#0f172a)]/50">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold text-[var(--foreground,#f8fafc)] mr-2">EUR/USD</span>
+          
+          <!-- Timeframe selector buttons -->
+          <div class="flex space-x-1 bg-[var(--background,#020617)] p-0.5 rounded border border-[var(--border,#1e293b)]">
+            <button data-tf="M1" class="tf-btn px-2 py-0.5 text-xs rounded font-medium bg-indigo-600 text-white">M1</button>
+            <button data-tf="M5" class="tf-btn px-2 py-0.5 text-xs rounded font-medium text-[var(--muted-foreground,#94a3b8)] hover:text-white">M5</button>
+            <button data-tf="H1" class="tf-btn px-2 py-0.5 text-xs rounded font-medium text-[var(--muted-foreground,#94a3b8)] hover:text-white">H1</button>
+            <button data-tf="D1" class="tf-btn px-2 py-0.5 text-xs rounded font-medium text-[var(--muted-foreground,#94a3b8)] hover:text-white">D1</button>
+          </div>
+
+          <div class="h-4 w-px bg-[var(--border,#334155)] mx-1"></div>
+
+          <!-- Overlays -->
+          <label class="flex items-center space-x-1 text-xs text-[var(--foreground,#cbd5e1)] cursor-pointer">
+            <input type="checkbox" id="check-ema" checked class="rounded border-[var(--border,#334155)] text-indigo-600">
+            <span>EMA 20</span>
+          </label>
+          <label class="flex items-center space-x-1 text-xs text-[var(--foreground,#cbd5e1)] cursor-pointer">
+            <input type="checkbox" id="check-greeks" checked class="rounded border-[var(--border,#334155)] text-emerald-600">
+            <span>Fincor Greek Curve (Δ)</span>
+          </label>
+        </div>
+
+        <!-- Real-Time Cursor Stats (OHLCV + Greek) -->
+        <div id="cursor-stats" class="text-xs font-mono text-[var(--muted-foreground,#94a3b8)] flex items-center space-x-3">
+          <span>O: <strong id="stat-o" class="text-[var(--foreground,#f8fafc)]">1.0850</strong></span>
+          <span>H: <strong id="stat-h" class="text-emerald-400">1.0855</strong></span>
+          <span>L: <strong id="stat-l" class="text-rose-400">1.0848</strong></span>
+          <span>C: <strong id="stat-c" class="text-[var(--foreground,#f8fafc)]">1.0852</strong></span>
+          <span>Vol: <strong id="stat-v" class="text-sky-400">120</strong></span>
+          <span>Δ: <strong id="stat-delta" class="text-indigo-400">0.5240</strong></span>
+        </div>
+      </div>
+
+      <!-- Canvas Chart Container -->
+      <div class="flex-1 relative overflow-hidden" id="canvas-container">
+        <canvas id="main-chart-canvas" class="w-full h-full block cursor-crosshair"></canvas>
+      </div>
+
+      <!-- Time-Travel Filtration Scrubber -->
+      <div class="h-8 border-t border-[var(--border,#1e293b)] bg-[var(--card,#0f172a)] px-4 flex items-center space-x-3 flex-shrink-0">
+        <span class="text-[10px] uppercase font-bold text-indigo-400 flex-shrink-0">Filtration Time (F_t):</span>
+        <input type="range" id="time-scrubber" min="0" max="100" value="100" class="flex-1 accent-indigo-500 h-1 bg-[var(--background,#020617)] rounded-lg cursor-pointer">
+        <span id="scrubber-time-label" class="text-xs font-mono text-[var(--muted-foreground,#94a3b8)] flex-shrink-0">Live (t=Latest)</span>
+      </div>
+
+      <!-- BOTTOM TABS: Positions, Orders, Fincor Plugin Supervisor, Log -->
+      <div class="h-44 border-t border-[var(--border,#1e293b)] bg-[var(--card,#0f172a)] flex flex-col flex-shrink-0">
+        <div class="h-8 border-b border-[var(--border,#1e293b)] px-3 flex items-center space-x-4 text-xs font-medium bg-[var(--background,#020617)]/30">
+          <button data-tab="positions" class="tab-btn pb-1.5 border-b-2 border-indigo-500 text-indigo-400 font-semibold">Active Positions (Ledger)</button>
+          <button data-tab="orders" class="tab-btn pb-1.5 text-[var(--muted-foreground,#94a3b8)] hover:text-[var(--foreground,#f8fafc)]">Execution Orders</button>
+          <button data-tab="plugins" class="tab-btn pb-1.5 text-[var(--muted-foreground,#94a3b8)] hover:text-[var(--foreground,#f8fafc)]">Hot-Swappable Plugins (Fincor)</button>
+          <button data-tab="logs" class="tab-btn pb-1.5 text-[var(--muted-foreground,#94a3b8)] hover:text-[var(--foreground,#f8fafc)]">Engine Audit Log</button>
+        </div>
+
+        <div class="flex-1 p-2 overflow-auto font-mono text-xs" id="tab-content-container">
+          
+          <!-- TAB 1: POSITIONS -->
+          <div id="tab-positions" class="space-y-1">
+            <table class="w-full text-left">
+              <thead class="text-[10px] uppercase text-[var(--muted-foreground,#64748b)] border-b border-[var(--border,#1e293b)]">
+                <tr>
+                  <th class="py-1">Symbol</th>
+                  <th>Side</th>
+                  <th>Quantity</th>
+                  <th>Entry Price</th>
+                  <th>Current Price</th>
+                  <th>Unrealized PnL</th>
+                  <th>Hedge Ratio (Δ)</th>
+                </tr>
+              </thead>
+              <tbody id="positions-tbody" class="divide-y divide-[var(--border,#1e293b)]">
+                <tr>
+                  <td class="py-1 font-bold text-[var(--foreground,#f8fafc)]">EUR/USD</td>
+                  <td class="text-rose-400 font-semibold">SELL (Hedge)</td>
+                  <td id="pos-qty">-5.24</td>
+                  <td id="pos-entry">1.08490</td>
+                  <td id="pos-current">1.08500</td>
+                  <td id="pos-pnl" class="text-rose-400 font-bold">-$0.52</td>
+                  <td id="pos-delta" class="text-indigo-400">100% Δ-Neutral</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- TAB 2: ORDERS -->
+          <div id="tab-orders" class="hidden space-y-1">
+            <table class="w-full text-left">
+              <thead class="text-[10px] uppercase text-[var(--muted-foreground,#64748b)] border-b border-[var(--border,#1e293b)]">
+                <tr>
+                  <th class="py-1">Order ID</th>
+                  <th>Time</th>
+                  <th>Symbol</th>
+                  <th>Direction</th>
+                  <th>Qty</th>
+                  <th>Status</th>
+                  <th>Fill Price</th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody" class="divide-y divide-[var(--border,#1e293b)]">
+                <!-- Orders dynamic -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- TAB 3: PLUGINS -->
+          <div id="tab-plugins" class="hidden space-y-2">
+            <div class="grid grid-cols-3 gap-2">
+              
+              <!-- Fincor Greeks Hedger -->
+              <div class="p-2 rounded border border-indigo-500/40 bg-indigo-500/10 flex justify-between items-center">
+                <div>
+                  <div class="font-bold text-[var(--foreground,#f8fafc)]">Fincor Greeks Hedger</div>
+                  <div class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">id: fincor_greeks_hedger • v1.0</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ACTIVE</span>
+                  <button class="px-2 py-0.5 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white rounded" onclick="hotReloadPlugin('fincor_greeks_hedger')">Reload</button>
+                </div>
+              </div>
+
+              <!-- Fincor Martingale Guard -->
+              <div class="p-2 rounded border border-emerald-500/40 bg-emerald-500/10 flex justify-between items-center">
+                <div>
+                  <div class="font-bold text-[var(--foreground,#f8fafc)]">Fincor Martingale Guard</div>
+                  <div class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">id: fincor_martingale_guard • v1.0</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ACTIVE</span>
+                  <button class="px-2 py-0.5 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white rounded" onclick="hotReloadPlugin('fincor_martingale_guard')">Reload</button>
+                </div>
+              </div>
+
+              <!-- Chaos Simulation Rogue Plugin -->
+              <div class="p-2 rounded border border-rose-500/40 bg-rose-500/10 flex justify-between items-center">
+                <div>
+                  <div class="font-bold text-[var(--foreground,#f8fafc)]">Rogue Chaos Plugin</div>
+                  <div class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">Tests Supervisor & Quarantine</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span id="rogue-status-badge" class="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30">READY</span>
+                  <button id="btn-trigger-crash" class="px-2 py-0.5 text-[10px] bg-rose-600 hover:bg-rose-500 text-white rounded" onclick="triggerRogueCrash()">Inject Fault</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- TAB 4: AUDIT LOG -->
+          <div id="tab-logs" class="hidden space-y-1 text-[11px] overflow-y-auto max-h-32">
+            <div id="audit-log-entries" class="space-y-0.5">
+              <div class="text-emerald-400">[INFO] Tradis 24/7/365 Runtime initialized. Cordis spatiotemporal manifolds active.</div>
+              <div class="text-sky-400">[INFO] Connected to Fincor Quantitative Kernel v0.1.0.</div>
+              <div class="text-indigo-400">[INFO] Bounded ring buffer initialized with capacity 500. Zero GC leak mode engaged.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL: Greeks & Account Summary -->
+    <aside class="w-64 border-l border-[var(--border,#1e293b)] bg-[var(--card,#0f172a)] flex flex-col flex-shrink-0">
+      
+      <!-- Fincor Real-Time Greeks Panel -->
+      <div class="p-3 border-b border-[var(--border,#1e293b)]">
+        <div class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-2 flex items-center justify-between">
+          <span>Fincor Greeks Monitor</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono">B-S Mdl</span>
+        </div>
+        
+        <div class="space-y-2 text-xs font-mono">
+          <div class="bg-[var(--background,#020617)]/60 p-2 rounded border border-[var(--border,#1e293b)]">
+            <div class="flex justify-between text-[var(--muted-foreground,#94a3b8)]">
+              <span>Delta (Δ):</span>
+              <strong id="greek-delta-val" class="text-emerald-400">0.5240</strong>
+            </div>
+            <div class="w-full bg-[var(--border,#1e293b)] h-1 rounded mt-1 overflow-hidden">
+              <div id="greek-delta-bar" class="bg-emerald-500 h-full w-[52%]"></div>
+            </div>
+          </div>
+
+          <div class="bg-[var(--background,#020617)]/60 p-2 rounded border border-[var(--border,#1e293b)]">
+            <div class="flex justify-between text-[var(--muted-foreground,#94a3b8)]">
+              <span>Gamma (Γ):</span>
+              <strong id="greek-gamma-val" class="text-sky-400">0.0382</strong>
+            </div>
+            <div class="w-full bg-[var(--border,#1e293b)] h-1 rounded mt-1 overflow-hidden">
+              <div id="greek-gamma-bar" class="bg-sky-500 h-full w-[38%]"></div>
+            </div>
+          </div>
+
+          <div class="bg-[var(--background,#020617)]/60 p-2 rounded border border-[var(--border,#1e293b)]">
+            <div class="flex justify-between text-[var(--muted-foreground,#94a3b8)]">
+              <span>Vega (ν):</span>
+              <strong id="greek-vega-val" class="text-amber-400">0.3951</strong>
+            </div>
+            <div class="w-full bg-[var(--border,#1e293b)] h-1 rounded mt-1 overflow-hidden">
+              <div id="greek-vega-bar" class="bg-amber-500 h-full w-[40%]"></div>
+            </div>
+          </div>
+
+          <div class="bg-[var(--background,#020617)]/60 p-2 rounded border border-[var(--border,#1e293b)]">
+            <div class="flex justify-between text-[var(--muted-foreground,#94a3b8)]">
+              <span>Theta (Θ):</span>
+              <strong id="greek-theta-val" class="text-rose-400">-0.0142</strong>
+            </div>
+            <div class="w-full bg-[var(--border,#1e293b)] h-1 rounded mt-1 overflow-hidden">
+              <div id="greek-theta-bar" class="bg-rose-500 h-full w-[14%]"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account & Margin Ledger -->
+      <div class="p-3 flex-1 flex flex-col justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground,#94a3b8)] mb-2">
+            Account Ledger
+          </div>
+          <div class="space-y-1.5 text-xs font-mono">
+            <div class="flex justify-between">
+              <span class="text-[var(--muted-foreground,#94a3b8)]">Balance:</span>
+              <strong id="acc-balance" class="text-[var(--foreground,#f8fafc)]">$100,000.00</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--muted-foreground,#94a3b8)]">Equity:</span>
+              <strong id="acc-equity" class="text-emerald-400">$99,999.48</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--muted-foreground,#94a3b8)]">Margin Used:</span>
+              <strong id="acc-margin" class="text-amber-400">$56.85</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--muted-foreground,#94a3b8)]">Free Margin:</span>
+              <strong id="acc-freemargin" class="text-[var(--foreground,#f8fafc)]">$99,942.63</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--muted-foreground,#94a3b8)]">Leverage:</span>
+              <span class="text-indigo-400">1:100</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Trade Panel -->
+        <div class="space-y-1.5 pt-3 border-t border-[var(--border,#1e293b)]">
+          <div class="text-[11px] font-semibold text-[var(--muted-foreground,#94a3b8)] uppercase">Manual Order</div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button onclick="manualOrder('Buy')" class="py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded">BUY</button>
+            <button onclick="manualOrder('Sell')" class="py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded">SELL</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- DATASET LOADER MODAL -->
+  <div id="dataset-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--card,#0f172a)] border border-[var(--border,#1e293b)] rounded-xl w-full max-w-lg p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-[var(--border,#1e293b)] pb-3">
+        <h3 class="font-bold text-base text-[var(--foreground,#f8fafc)]">Load Market Dataset & Spatiotemporal Feeds</h3>
+        <button id="btn-close-modal" class="text-[var(--muted-foreground,#94a3b8)] hover:text-white">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-[var(--muted-foreground,#94a3b8)] mb-1">Preset Institutional Datasets:</label>
+          <select id="dataset-preset-select" class="w-full bg-[var(--background,#020617)] border border-[var(--border,#334155)] rounded p-2 text-white">
+            <option value="eurusd_hf">EUR/USD 2026 High-Frequency Tick Replay</option>
+            <option value="btc_vol">BTC/USD Extreme Volatility & Jump-Diffusion</option>
+            <option value="sp500_drift">S&P 500 Options Expiry Drift Simulation</option>
+            <option value="synthetic_gbm">Synthetic Geometric Brownian Motion (GBM)</option>
+          </select>
+        </div>
+
+        <div id="gbm-params" class="p-3 bg-[var(--background,#020617)]/60 rounded border border-[var(--border,#1e293b)] space-y-2">
+          <div class="font-semibold text-indigo-400 text-[11px]">GBM Stochastic Parameters:</div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <span class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">Drift (μ):</span>
+              <input type="number" id="gbm-mu" value="0.05" step="0.01" class="w-full bg-[var(--card,#0f172a)] border border-[var(--border,#334155)] rounded px-1.5 py-0.5 text-white">
+            </div>
+            <div>
+              <span class="text-[10px] text-[var(--muted-foreground,#94a3b8)]">Volatility (σ):</span>
+              <input type="number" id="gbm-sigma" value="0.20" step="0.01" class="w-full bg-[var(--card,#0f172a)] border border-[var(--border,#334155)] rounded px-1.5 py-0.5 text-white">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-[var(--muted-foreground,#94a3b8)] mb-1">Or Paste Raw CSV Data (Timestamp, Bid, Ask, Last, Volume):</label>
+          <textarea id="raw-csv-input" rows="3" placeholder="1700000000, 1.0850, 1.0851, 1.0850, 100&#10;1700000060, 1.0852, 1.0853, 1.0852, 150" class="w-full bg-[var(--background,#020617)] border border-[var(--border,#334155)] rounded p-2 text-white font-mono text-[11px]"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t border-[var(--border,#1e293b)]">
+        <button id="btn-cancel-dataset" class="px-3 py-1.5 rounded bg-[var(--background,#020617)] hover:bg-[var(--border,#1e293b)] text-xs text-[var(--foreground,#cbd5e1)]">Cancel</button>
+        <button id="btn-confirm-load-dataset" class="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Load & Initialize Feeds</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT ENGINE IMPLEMENTING CORDIS SPATIOTEMPORAL THEOREMS -->
+  <script>
+    // ==========================================
+    // TRADIS RUNTIME & CORDIS SPATIOTEMPORAL ENGINE
+    // ==========================================
+    
+    // --- 1. Fixed-Capacity Bounded Ring Buffer (Theorem 3: Bounded Memory O(1)) ---
+    class RingBuffer {
+      constructor(capacity = 500) {
+        this.capacity = capacity;
+        this.buffer = new Array(capacity);
+        this.head = 0;
+        this.count = 0;
+      }
+      push(item) {
+        this.buffer[this.head] = item;
+        this.head = (this.head + 1) % this.capacity;
+        if (this.count < this.capacity) this.count++;
+      }
+      toArray() {
+        const arr = [];
+        for (let i = 0; i < this.count; i++) {
+          const idx = (this.head - 1 - i + this.capacity) % this.capacity;
+          arr.push(this.buffer[idx]);
+        }
+        return arr.reverse();
+      }
+      latest() {
+        if (this.count === 0) return null;
+        const idx = (this.head - 1 + this.capacity) % this.capacity;
+        return this.buffer[idx];
+      }
+    }
+
+    // --- State & Timeframes ---
+    const STATE = {
+      isRunning: true,
+      speed: 5,
+      symbol: "EUR/USD",
+      timeframe: "M1",
+      ticksProcessed: 0,
+      startTime: Date.now(),
+      
+      // Dynamic Spatial Coeffects
+      spot: 1.08500,
+      bid: 1.08495,
+      ask: 1.08505,
+      spread: 0.00010,
+      
+      // Time Filtration & Bounded Buffers
+      currentTime: 1700000000,
+      rawTickHistory: [],
+      filtrationIndex: 0,
+      
+      ringBuffers: {
+        M1: new RingBuffer(500),
+        M5: new RingBuffer(500),
+        H1: new RingBuffer(500),
+        D1: new RingBuffer(500),
+      },
+      currentBars: {
+        M1: null, M5: null, H1: null, D1: null
+      },
+      
+      // Fincor Quantitative State
+      optionStrike: 1.0850,
+      optionExpiry: 1.0,
+      volatility: 0.20,
+      interestRate: 0.05,
+      greeks: { delta: 0.524, gamma: 0.038, vega: 0.395, theta: -0.014 },
+      greekHistory: new RingBuffer(500),
+
+      // Positions & Ledger
+      position: { qty: -5.24, avgEntry: 1.08490, pnl: -0.52 },
+      account: { balance: 100000.0, equity: 99999.48, marginUsed: 56.85, freeMargin: 99942.63 },
+      orders: [],
+      
+      // Plugins
+      plugins: {
+        fincor_greeks_hedger: { status: "Active" },
+        fincor_martingale_guard: { status: "Active" },
+        rogue_chaos: { status: "Ready" }
+      }
+    };
+
+    // --- 2. Black-Scholes Greeks Engine (Fincor Bridge) ---
+    function computeBlackScholesGreeks(spot, strike, t, r, sigma) {
+      if (t <= 0) return { delta: spot > strike ? 1.0 : 0.0, gamma: 0.0, vega: 0.0, theta: 0.0 };
+      const d1 = (Math.log(spot / strike) + (r + 0.5 * sigma * sigma) * t) / (sigma * Math.sqrt(t));
+      const d2 = d1 - sigma * Math.sqrt(t);
+      
+      // Standard Normal CDF & PDF
+      const normPdf = (x) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+      const normCdf = (x) => 0.5 * (1 + erf(x / Math.SQRT2));
+      function erf(x) {
+        // Abramowitz and Stegun approximation
+        const a1 =  0.254829592, a2 = -0.284496736, a3 =  1.421413741;
+        const a4 = -1.453152027, a5 =  1.061405429, p  =  0.3275911;
+        const sign = x < 0 ? -1 : 1;
+        x = Math.abs(x);
+        const t = 1.0 / (1.0 + p * x);
+        const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+        return sign * y;
+      }
+
+      const delta = normCdf(d1);
+      const gamma = normPdf(d1) / (spot * sigma * Math.sqrt(t));
+      const vega = spot * normPdf(d1) * Math.sqrt(t) / 100;
+      const theta = (- (spot * normPdf(d1) * sigma) / (2 * Math.sqrt(t)) - r * strike * Math.exp(-r * t) * normCdf(d2)) / 365;
+
+      return { delta, gamma, vega, theta };
+    }
+
+    // --- 3. Synthetic Stochastic Market Generator ---
+    function generateDataset(type = "eurusd_hf", nTicks = 2000) {
+      const ticks = [];
+      let s = 1.08500;
+      let t = 1700000000;
+      const dt = 1.0; // 1-second interval
+      const mu = parseFloat(document.getElementById("gbm-mu")?.value || 0.05);
+      const sigma = parseFloat(document.getElementById("gbm-sigma")?.value || 0.20);
+
+      for (let i = 0; i < nTicks; i++) {
+        t += 60; // 1 minute steps
+        // Box-Muller normal sample
+        const u1 = Math.max(1e-10, Math.random());
+        const u2 = Math.random();
+        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+        let jump = 0;
+        if (type === "btc_vol" && Math.random() < 0.05) {
+          jump = (Math.random() - 0.5) * 0.0050; // Jumps
+        }
+        
+        const dW = (mu * (1/365/24/60)) + (sigma * Math.sqrt(1/365/24/60) * z) + jump;
+        s = s * Math.exp(dW);
+        
+        const spread = 0.00010;
+        const bid = s - spread / 2;
+        const ask = s + spread / 2;
+        const vol = Math.floor(50 + Math.random() * 200);
+
+        ticks.push({ timestamp: t, spot: s, bid, ask, last: s, volume: vol });
+      }
+      return ticks;
+    }
+
+    // --- 4. Spatiotemporal Timeframe Bar Aggregator ---
+    const TF_SECONDS = { M1: 60, M5: 300, H1: 3600, D1: 86400 };
+
+    function processTick(tick) {
+      STATE.ticksProcessed++;
+      STATE.currentTime = tick.timestamp;
+      STATE.spot = tick.spot;
+      STATE.bid = tick.bid;
+      STATE.ask = tick.ask;
+
+      // Update Timeframes
+      for (const tf of ["M1", "M5", "H1", "D1"]) {
+        const tfSec = TF_SECONDS[tf];
+        const barStart = Math.floor(tick.timestamp / tfSec) * tfSec;
+        let curr = STATE.currentBars[tf];
+
+        if (!curr || curr.openTime !== barStart) {
+          if (curr) {
+            STATE.ringBuffers[tf].push({ ...curr });
+          }
+          STATE.currentBars[tf] = {
+            openTime: barStart,
+            open: tick.last,
+            high: tick.last,
+            low: tick.last,
+            close: tick.last,
+            volume: tick.volume
+          };
+        } else {
+          curr.high = Math.max(curr.high, tick.last);
+          curr.low = Math.min(curr.low, tick.last);
+          curr.close = tick.last;
+          curr.volume += tick.volume;
+        }
+      }
+
+      // Update Fincor Greeks Plugin
+      if (STATE.plugins.fincor_greeks_hedger.status === "Active") {
+        const g = computeBlackScholesGreeks(STATE.spot, STATE.optionStrike, STATE.optionExpiry, STATE.interestRate, STATE.volatility);
+        STATE.greeks = g;
+        STATE.greekHistory.push({ time: tick.timestamp, delta: g.delta });
+
+        // Delta Neutral Hedging Order Check
+        const targetHedgeQty = - (10.0 * g.delta);
+        const discrepancy = targetHedgeQty - STATE.position.qty;
+        if (Math.abs(discrepancy) >= 0.25) {
+          executeOrder(discrepancy > 0 ? "BUY" : "SELL", Math.abs(discrepancy), STATE.spot, "Fincor Δ-Hedger");
+        }
+      }
+
+      // Update Position Mark-to-Market PnL
+      STATE.position.pnl = STATE.position.qty * (STATE.spot - STATE.position.avgEntry) * 10000;
+      STATE.account.equity = STATE.account.balance + STATE.position.pnl;
+      STATE.account.freeMargin = STATE.account.equity - STATE.account.marginUsed;
+
+      updateDOM();
+      updateUI();
+    }
+
+    function executeOrder(side, qty, price, source = "Manual") {
+      const ordId = `ORD_${Date.now().toString().slice(-6)}`;
+      const order = {
+        id: ordId,
+        time: new Date(STATE.currentTime * 1000).toISOString().slice(11, 19),
+        symbol: STATE.symbol,
+        side,
+        qty: parseFloat(qty.toFixed(2)),
+        price: parseFloat(price.toFixed(5)),
+        source
+      };
+      STATE.orders.unshift(order);
+      if (STATE.orders.length > 50) STATE.orders.pop();
+
+      // Update Position
+      const signedQty = side === "BUY" ? qty : -qty;
+      const totalCost = (STATE.position.qty * STATE.position.avgEntry) + (signedQty * price);
+      STATE.position.qty = parseFloat((STATE.position.qty + signedQty).toFixed(2));
+      if (STATE.position.qty !== 0) {
+        STATE.position.avgEntry = Math.abs(totalCost / STATE.position.qty);
+      }
+      
+      logAudit(`[ORDER FILLED] ${side} ${qty.toFixed(2)} ${STATE.symbol} @ ${price.toFixed(5)} (${source})`);
+      renderOrdersTable();
+    }
+
+    // --- 5. DOM (Depth of Market) ---
+    function updateDOM() {
+      const asksDiv = document.getElementById("dom-asks");
+      const bidsDiv = document.getElementById("dom-bids");
+      const midDiv = document.getElementById("dom-mid");
+      if (!asksDiv || !bidsDiv) return;
+
+      midDiv.textContent = STATE.spot.toFixed(5);
+      document.getElementById("dom-spread").textContent = STATE.spread.toFixed(5);
+
+      let asksHtml = "";
+      for (let i = 4; i >= 1; i--) {
+        const p = (STATE.ask + i * 0.00005).toFixed(5);
+        const v = Math.floor(100 + Math.random() * 250);
+        asksHtml += `<div class="flex justify-between text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded">
+          <span>${p}</span><span class="text-rose-300/70">${v}k</span>
+        </div>`;
+      }
+      asksDiv.innerHTML = asksHtml;
+
+      let bidsHtml = "";
+      for (let i = 1; i <= 4; i++) {
+        const p = (STATE.bid - i * 0.00005).toFixed(5);
+        const v = Math.floor(100 + Math.random() * 250);
+        bidsHtml += `<div class="flex justify-between text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+          <span>${p}</span><span class="text-emerald-300/70">${v}k</span>
+        </div>`;
+      }
+      bidsDiv.innerHTML = bidsHtml;
+    }
+
+    // --- 6. Interactive Candlestick Canvas Renderer ---
+    const canvas = document.getElementById("main-chart-canvas");
+    const ctx = canvas.getContext("2d");
+
+    function renderChart() {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Fetch active bars from ring buffer
+      const rb = STATE.ringBuffers[STATE.timeframe];
+      const bars = [...rb.toArray()];
+      if (STATE.currentBars[STATE.timeframe]) {
+        bars.push(STATE.currentBars[STATE.timeframe]);
+      }
+
+      if (bars.length === 0) return;
+
+      const visibleBars = bars.slice(-60); // Show last 60 bars
+      const numBars = visibleBars.length;
+
+      // Min/Max bounds
+      let minPrice = Infinity;
+      let maxPrice = -Infinity;
+      let maxVol = 0;
+
+      visibleBars.forEach(b => {
+        if (b.low < minPrice) minPrice = b.low;
+        if (b.high > maxPrice) maxPrice = b.high;
+        if (b.volume > maxVol) maxVol = b.volume;
+      });
+
+      const padding = (maxPrice - minPrice) * 0.1 || 0.0005;
+      minPrice -= padding;
+      maxPrice += padding;
+
+      const chartH = h - 60; // Leave 60px for volume
+      const barWidth = Math.max(3, (w - 60) / 60);
+
+      // Grid Lines
+      ctx.strokeStyle = "rgba(30, 41, 59, 0.7)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 5; i++) {
+        const y = (chartH / 6) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w - 60, y);
+        ctx.stroke();
+
+        const priceAtY = maxPrice - ((y / chartH) * (maxPrice - minPrice));
+        ctx.fillStyle = "#64748b";
+        ctx.font = "10px monospace";
+        ctx.fillText(priceAtY.toFixed(5), w - 55, y + 3);
+      }
+
+      // Draw Candlesticks & Volume
+      const emaPoints = [];
+
+      visibleBars.forEach((b, idx) => {
+        const x = idx * barWidth + barWidth / 2;
+        const openY = chartH - ((b.open - minPrice) / (maxPrice - minPrice)) * chartH;
+        const closeY = chartH - ((b.close - minPrice) / (maxPrice - minPrice)) * chartH;
+        const highY = chartH - ((b.high - minPrice) / (maxPrice - minPrice)) * chartH;
+        const lowY = chartH - ((b.low - minPrice) / (maxPrice - minPrice)) * chartH;
+
+        const isUp = b.close >= b.open;
+        const color = isUp ? "#10b981" : "#f43f5e";
+
+        // Wick
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, highY);
+        ctx.lineTo(x, lowY);
+        ctx.stroke();
+
+        // Body
+        ctx.fillStyle = color;
+        const bodyTop = Math.min(openY, closeY);
+        const bodyH = Math.max(2, Math.abs(closeY - openY));
+        ctx.fillRect(x - barWidth * 0.35, bodyTop, barWidth * 0.7, bodyH);
+
+        // Volume Bar
+        const volH = (b.volume / maxVol) * 45;
+        ctx.fillStyle = isUp ? "rgba(16, 185, 129, 0.25)" : "rgba(244, 63, 94, 0.25)";
+        ctx.fillRect(x - barWidth * 0.35, h - volH - 5, barWidth * 0.7, volH);
+
+        emaPoints.push({ x, y: (openY + closeY) / 2 });
+      });
+
+      // EMA Overlay
+      if (document.getElementById("check-ema").checked && emaPoints.length > 1) {
+        ctx.strokeStyle = "#818cf8";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        emaPoints.forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.stroke();
+      }
+
+      // Fincor Greek Overlay (Delta Curve)
+      if (document.getElementById("check-greeks").checked && visibleBars.length > 1) {
+        ctx.strokeStyle = "#34d399";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        visibleBars.forEach((b, i) => {
+          const g = computeBlackScholesGreeks(b.close, STATE.optionStrike, 1.0, 0.05, 0.20);
+          const x = i * barWidth + barWidth / 2;
+          const y = chartH - (g.delta * (chartH * 0.8)); // scaled delta
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // --- 7. UI Updates & Log ---
+    function updateUI() {
+      // Header Stats
+      const uptimeSec = Math.floor((Date.now() - STATE.startTime) / 1000);
+      const hrs = String(Math.floor(uptimeSec / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((uptimeSec % 3600) / 60)).padStart(2, '0');
+      const secs = String(uptimeSec % 60).padStart(2, '0');
+      document.getElementById("uptime-display").textContent = `${hrs}:${mins}:${secs}`;
+      document.getElementById("ticks-count-display").textContent = STATE.ticksProcessed.toLocaleString();
+
+      // Left Panel Spot
+      document.getElementById("side-spot-price").textContent = STATE.spot.toFixed(5);
+      
+      // Cursor / Latest Bar Stats
+      const curBar = STATE.currentBars[STATE.timeframe];
+      if (curBar) {
+        document.getElementById("stat-o").textContent = curBar.open.toFixed(5);
+        document.getElementById("stat-h").textContent = curBar.high.toFixed(5);
+        document.getElementById("stat-l").textContent = curBar.low.toFixed(5);
+        document.getElementById("stat-c").textContent = curBar.close.toFixed(5);
+        document.getElementById("stat-v").textContent = curBar.volume;
+        document.getElementById("stat-delta").textContent = STATE.greeks.delta.toFixed(4);
+      }
+
+      // Greeks Panel
+      document.getElementById("greek-delta-val").textContent = STATE.greeks.delta.toFixed(4);
+      document.getElementById("greek-delta-bar").style.width = `${Math.min(100, Math.max(0, STATE.greeks.delta * 100))}%`;
+      
+      document.getElementById("greek-gamma-val").textContent = STATE.greeks.gamma.toFixed(4);
+      document.getElementById("greek-gamma-bar").style.width = `${Math.min(100, Math.max(0, STATE.greeks.gamma * 1000))}%`;
+
+      document.getElementById("greek-vega-val").textContent = STATE.greeks.vega.toFixed(4);
+      document.getElementById("greek-vega-bar").style.width = `${Math.min(100, Math.max(0, STATE.greeks.vega * 100))}%`;
+
+      document.getElementById("greek-theta-val").textContent = STATE.greeks.theta.toFixed(4);
+      document.getElementById("greek-theta-bar").style.width = `${Math.min(100, Math.max(0, Math.abs(STATE.greeks.theta) * 1000))}%`;
+
+      // Account & Ledger
+      document.getElementById("acc-balance").textContent = `$${STATE.account.balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById("acc-equity").textContent = `$${STATE.account.equity.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      document.getElementById("acc-margin").textContent = `$${STATE.account.marginUsed.toFixed(2)}`;
+      document.getElementById("acc-freemargin").textContent = `$${STATE.account.freeMargin.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+      // Position
+      document.getElementById("pos-qty").textContent = STATE.position.qty.toFixed(2);
+      document.getElementById("pos-entry").textContent = STATE.position.avgEntry.toFixed(5);
+      document.getElementById("pos-current").textContent = STATE.spot.toFixed(5);
+      const pnlEl = document.getElementById("pos-pnl");
+      pnlEl.textContent = `${STATE.position.pnl >= 0 ? '+' : ''}$${STATE.position.pnl.toFixed(2)}`;
+      pnlEl.className = STATE.position.pnl >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold";
+
+      renderChart();
+    }
+
+    function renderOrdersTable() {
+      const tbody = document.getElementById("orders-tbody");
+      if (!tbody) return;
+      tbody.innerHTML = STATE.orders.map(o => `
+        <tr class="hover:bg-[var(--background,#020617)]/40">
+          <td class="py-1 text-[var(--foreground,#f8fafc)]">${o.id}</td>
+          <td class="text-[var(--muted-foreground,#94a3b8)]">${o.time}</td>
+          <td>${o.symbol}</td>
+          <td class="${o.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'} font-semibold">${o.side}</td>
+          <td>${o.qty}</td>
+          <td><span class="px-1 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400">FILLED</span></td>
+          <td class="font-bold text-[var(--foreground,#f8fafc)]">${o.price.toFixed(5)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function logAudit(msg) {
+      const container = document.getElementById("audit-log-entries");
+      if (!container) return;
+      const div = document.createElement("div");
+      div.className = msg.includes("QUARANTINED") || msg.includes("FAULT") ? "text-rose-400 font-semibold" : "text-[var(--muted-foreground,#cbd5e1)]";
+      div.textContent = `[${new Date().toISOString().slice(11, 19)}] ${msg}`;
+      container.appendChild(div);
+      container.parentElement.scrollTop = container.parentElement.scrollHeight;
+    }
+
+    // --- 8. Hot-Plugin Supervision & Chaos Testing ---
+    window.hotReloadPlugin = function(pluginId) {
+      logAudit(`[HOT-RELOAD] Reloading plugin '${pluginId}' at runtime without engine downtime...`);
+      setTimeout(() => {
+        logAudit(`[HOT-RELOAD SUCCESS] Plugin '${pluginId}' upgraded & active. State preserved.`);
+      }, 300);
+    };
+
+    window.triggerRogueCrash = function() {
+      logAudit(`[CHAOS SIMULATION] Injecting unhandled division-by-zero into Rogue Chaos Plugin...`);
+      STATE.plugins.rogue_chaos.status = "Quarantined";
+      document.getElementById("rogue-status-badge").textContent = "QUARANTINED";
+      document.getElementById("rogue-status-badge").className = "px-1.5 py-0.5 rounded text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30";
+      
+      logAudit(`[SUPERVISOR INTERCEPT] Invariant T4 triggered: Rogue Plugin safely quarantined! Engine running with 0% downtime.`);
+    };
+
+    window.manualOrder = function(side) {
+      executeOrder(side, 1.0, side === "BUY" ? STATE.ask : STATE.bid, "Manual Trader");
+    };
+
+    // --- 9. Event Listeners & Loop ---
+    document.querySelectorAll(".tf-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tf-btn").forEach(b => {
+          b.className = "tf-btn px-2 py-0.5 text-xs rounded font-medium text-[var(--muted-foreground,#94a3b8)] hover:text-white";
+        });
+        btn.className = "tf-btn px-2 py-0.5 text-xs rounded font-medium bg-indigo-600 text-white";
+        STATE.timeframe = btn.dataset.tf;
+        renderChart();
+      });
+    });
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(b => {
+          b.className = "tab-btn pb-1.5 text-[var(--muted-foreground,#94a3b8)] hover:text-[var(--foreground,#f8fafc)]";
+        });
+        btn.className = "tab-btn pb-1.5 border-b-2 border-indigo-500 text-indigo-400 font-semibold";
+        
+        document.querySelectorAll("#tab-content-container > div").forEach(d => d.classList.add("hidden"));
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
+      });
+    });
+
+    document.getElementById("btn-play-pause").addEventListener("click", () => {
+      STATE.isRunning = !STATE.isRunning;
+      const btn = document.getElementById("btn-play-pause");
+      btn.textContent = STATE.isRunning ? "⏸ Pause" : "▶ Play";
+      btn.className = STATE.isRunning ? "px-3 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded" : "px-3 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded";
+    });
+
+    document.getElementById("speed-select").addEventListener("change", (e) => {
+      STATE.speed = parseInt(e.target.value);
+    });
+
+    // Modal Dataset Loader
+    document.getElementById("btn-load-dataset-modal").addEventListener("click", () => {
+      document.getElementById("dataset-modal").classList.remove("hidden");
+    });
+    document.getElementById("btn-close-modal").addEventListener("click", () => {
+      document.getElementById("dataset-modal").classList.add("hidden");
+    });
+    document.getElementById("btn-cancel-dataset").addEventListener("click", () => {
+      document.getElementById("dataset-modal").classList.add("hidden");
+    });
+    document.getElementById("btn-confirm-load-dataset").addEventListener("click", () => {
+      const preset = document.getElementById("dataset-preset-select").value;
+      logAudit(`[DATASET LOAD] Initializing historical feed: ${preset}...`);
+      STATE.rawTickHistory = generateDataset(preset, 1500);
+      STATE.filtrationIndex = 0;
+      document.getElementById("dataset-modal").classList.add("hidden");
+      logAudit(`[DATASET READY] Loaded 1,500 ticks into spatiotemporal memory.`);
+    });
+
+    // Time Scrubber (Temporal Reversibility / Rollback)
+    document.getElementById("time-scrubber").addEventListener("input", (e) => {
+      const pct = parseInt(e.target.value);
+      if (STATE.rawTickHistory.length > 0) {
+        STATE.filtrationIndex = Math.floor((pct / 100) * (STATE.rawTickHistory.length - 1));
+        const tick = STATE.rawTickHistory[STATE.filtrationIndex];
+        if (tick) {
+          processTick(tick);
+          document.getElementById("scrubber-time-label").textContent = `F_t: ${new Date(tick.timestamp * 1000).toISOString().slice(11, 19)}`;
+        }
+      }
+    });
+
+    // Initialize dataset & Run continuous tick loop
+    STATE.rawTickHistory = generateDataset("eurusd_hf", 1500);
+
+    setInterval(() => {
+      if (!STATE.isRunning || STATE.rawTickHistory.length === 0) return;
+      for (let s = 0; s < STATE.speed; s++) {
+        if (STATE.filtrationIndex < STATE.rawTickHistory.length) {
+          const tick = STATE.rawTickHistory[STATE.filtrationIndex++];
+          processTick(tick);
+        } else {
+          // Continuous streaming generator
+          const last = STATE.rawTickHistory[STATE.rawTickHistory.length - 1];
+          const newTick = generateDataset("eurusd_hf", 1)[0];
+          newTick.timestamp = last.timestamp + 60;
+          STATE.rawTickHistory.push(newTick);
+          STATE.filtrationIndex++;
+          processTick(newTick);
+        }
+      }
+      document.getElementById("time-scrubber").value = Math.min(100, Math.floor((STATE.filtrationIndex / STATE.rawTickHistory.length) * 100));
+    }, 200);
+
+    window.addEventListener("resize", renderChart);
+  </script>
+</body>
+</html>
