@@ -9,4 +9,5 @@ dune-project linguist-detectable=false
 .gitignore linguist-detectable=false
 README.md linguist-documentation=true
 RUN.bat linguist-detectable=false
+server.ps1 linguist-detectable=false
 index.html linguist-detectable=false

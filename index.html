@@ -35,7 +35,7 @@
       <div class="h-4 w-px bg-slate-700 mx-2"></div>
       <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center space-x-1">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-        <span>⚡ ZERO-F5 LIVE AUTO-SYNC</span>
+        <span>⚡ ZERO-F5 LIVE AUTO-SYNC (PORT 8088)</span>
       </span>
     </div>
 
@@ -277,26 +277,38 @@
 
   <script>
     // =========================================================================
-    // CONTINUOUS ZERO-F5 AUTO-SYNC ENGINE
+    // DUAL-CHANNEL ZERO-F5 LIVE-SYNC RECEIVER (HTTP & SSE)
     // =========================================================================
-    let lastContentHash = null;
-    async function liveSyncCheck() {
+    let currentVersion = null;
+
+    if (window.EventSource) {
       try {
-        const cleanUrl = window.location.href.split('?')[0];
-        const res = await fetch(cleanUrl + '?t=' + Date.now(), { cache: 'no-store' });
+        const es = new EventSource('/_cordis_live');
+        es.onmessage = (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'version_bump' || d.type === 'hmr_patch') {
+              console.log('[CORDIS LIVE-SYNC] Hot version bump received:', d);
+              window.location.reload();
+            }
+          } catch (_) {}
+        };
+      } catch (_) {}
+    }
+
+    setInterval(async () => {
+      try {
+        const res = await fetch('/_cordis_version?t=' + Date.now());
         if (res.ok) {
-          const text = await res.text();
-          const hash = text.length + '_' + text.slice(0, 100);
-          if (lastContentHash === null) {
-            lastContentHash = hash;
-          } else if (lastContentHash !== hash) {
-            lastContentHash = hash;
+          const d = await res.json();
+          if (currentVersion === null) currentVersion = d.version;
+          else if (currentVersion !== d.version) {
+            currentVersion = d.version;
             window.location.reload();
           }
         }
       } catch (_) {}
-    }
-    setInterval(liveSyncCheck, 250);
+    }, 250);
 
     // =========================================================================
     // LIVE COMMODITIES TRADING ENGINE (OXCAML BACKED)
